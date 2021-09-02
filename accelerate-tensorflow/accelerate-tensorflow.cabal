@@ -1,0 +1,36 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.34.4.
+--
+-- see: https://github.com/sol/hpack
+
+name:           accelerate-tensorflow
+version:        0.1.0.0
+synopsis:       Accelerate backend component generating TensorFlow graphs
+description:    Please see the README on GitHub at <https://github.com/tmcdonell/accelerate-tensorflow#readme>
+category:       Accelerate, Concurrency, Data, Parallelism
+homepage:       https://github.com/tmcdonell/accelerate-tensorflow#readme
+bug-reports:    https://github.com/tmcdonell/accelerate-tensorflow/issues
+author:         Trevor L. McDonell
+maintainer:     Trevor L. McDonell <trevor.mcdonell@gmail.com>
+copyright:      2021 The Accelerate Team
+license:        BSD3
+build-type:     Simple
+extra-source-files:
+    ../README.md
+    ../CHANGELOG.md
+
+source-repository head
+  type: git
+  location: https://github.com/tmcdonell/accelerate-tensorflow
+
+library
+  exposed-modules:
+      Lib
+  other-modules:
+      Paths_accelerate_tensorflow
+  hs-source-dirs:
+      src
+  build-depends:
+      base >=4.7 && <5
+  default-language: Haskell2010
