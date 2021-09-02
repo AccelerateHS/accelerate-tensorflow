@@ -25,8 +25,6 @@ source-repository head
   location: https://github.com/tmcdonell/accelerate-tensorflow
 
 library
-  exposed-modules:
-      Lib
   other-modules:
       Paths_accelerate_tensorflow
   hs-source-dirs:
