@@ -8,13 +8,22 @@ resolver: lts-18.8
 
 packages:
 - accelerate-tensorflow
+- accelerate-tensorflow-lite
 
 extra-deps:
 - github: tmcdonell/accelerate
-  commit: 7c769b761d0b2a91f318096b9dd3fced94616961
+  commit: 78f512fe30bf1a366cb6b6b7fa70727adebf8c5f
+
+- github: tmcdonell/accelerate-io
+  commit: 9d72bfb041ee2c9ffdb844b479f082e8993767f8
+  subdirs:
+    - accelerate-io-vector
 
 # Stack can't handle extra-deps from github that include submodules
 - extra-deps/tensorflow-haskell/tensorflow
+- extra-deps/tensorflow-haskell/tensorflow-core-ops
+- extra-deps/tensorflow-haskell/tensorflow-opgen
+- extra-deps/tensorflow-haskell/tensorflow-ops
 - extra-deps/tensorflow-haskell/tensorflow-proto
 
 - profunctors-5.5.2
