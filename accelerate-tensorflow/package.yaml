@@ -1,26 +1,27 @@
-name:                accelerate-tensorflow
-version:             0.1.0.0
-github:              "tmcdonell/accelerate-tensorflow"
-license:             BSD3
-author:              "Trevor L. McDonell"
-maintainer:          "Trevor L. McDonell <trevor.mcdonell@gmail.com>"
-copyright:           "2021 The Accelerate Team"
+name:               accelerate-tensorflow
+version:            0.1.0.0
+github:             "tmcdonell/accelerate-tensorflow"
+license:            BSD3
+author:             "Trevor L. McDonell"
+maintainer:         "Trevor L. McDonell <trevor.mcdonell@gmail.com>"
+copyright:          "2021 The Accelerate Team"
 
 extra-source-files:
 - ../README.md
 - ../CHANGELOG.md
 
 # Metadata used when publishing your package
-synopsis:            Accelerate backend component generating TensorFlow graphs
-category:            Accelerate, Concurrency, Data, Parallelism
+synopsis:           Accelerate backend component generating TensorFlow graphs
+category:           Accelerate, Concurrency, Data, Parallelism
 
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/tmcdonell/accelerate-tensorflow#readme>
+description:        Please see the README on GitHub at <https://github.com/tmcdonell/accelerate-tensorflow#readme>
 
 dependencies:
-- base >= 4.7 && < 5
+- base                          >= 4.7 && < 5
+- accelerate                    == 1.3.*
 
 library:
   source-dirs: src
