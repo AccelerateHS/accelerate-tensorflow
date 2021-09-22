@@ -15,16 +15,16 @@
 module Data.Array.Accelerate.TensorFlow.Lite.CodeGen.Exp
   where
 
+import Data.Array.Accelerate.TensorFlow.Lite.CodeGen.Base
 import Data.Array.Accelerate.TensorFlow.Lite.CodeGen.Tensor
+import Data.Array.Accelerate.TensorFlow.Lite.CodeGen.Environment
 import Data.Array.Accelerate.TensorFlow.Lite.CodeGen.Arithmetic     as A
 
 import Data.Array.Accelerate.AST
-import Data.Array.Accelerate.AST.Environment
+import Data.Array.Accelerate.AST.Var
 import Data.Array.Accelerate.Type
 
 import qualified TensorFlow.Ops                                     as TF
-
-import Text.Printf
 
 
 buildOpenExp
@@ -33,17 +33,17 @@ buildOpenExp
     -> Val env
     -> Val aenv
     -> OpenExp env aenv t
-    -> Tensor sh t
+    -> TensorArrayData t
 buildOpenExp sh env aenv =
   let
-      buildE :: OpenExp env aenv s -> Tensor sh s
+      buildE :: OpenExp env aenv s -> TensorArrayData s
       buildE = buildOpenExp sh env aenv
   in
   \case
-    -- Let lhs bnd                   -> undefined
-    -- Evar v                        -> undefined
+    Let lhs bnd body              -> buildOpenExp sh (env `push` (lhs, buildE bnd)) aenv body
+    Evar (Var _ ix)               -> prj ix env
     -- Foreign tR asm f x            -> undefined
-    -- Pair x y                      -> undefined
+    Pair x y                      -> (buildE x, buildE y)
     -- Nil                           -> undefined
     -- VecPack vR x                  -> undefined
     -- VecUnpack vR x                -> undefined
@@ -68,7 +68,7 @@ buildOpenExp sh env aenv =
 buildPrimConst
     :: TensorShape sh
     -> PrimConst t
-    -> Tensor sh t
+    -> TensorArrayData t
 buildPrimConst sh (PrimPi t)
   | FloatingDict <- floatingDict t
   = buildConst sh (SingleScalarType (NumSingleType (FloatingNumType t))) pi
@@ -84,8 +84,8 @@ buildConst
     :: TensorShape sh
     -> ScalarType t
     -> t
-    -> Tensor sh t
-buildConst sh = Tensor sh $$ scalar
+    -> TensorArrayData t
+buildConst sh = scalar
   where
     scalar :: ScalarType t -> t -> TensorArrayData t
     scalar (SingleScalarType t) = single t
@@ -117,19 +117,12 @@ buildConst sh = Tensor sh $$ scalar
 
 
 buildPrimFun
-    :: forall sh a b.
+    :: forall a b.
        PrimFun (a -> b)
-    -> Tensor sh a
-    -> Tensor sh b
-buildPrimFun f (Tensor sh adata) =
-  Tensor sh $ case f of
+    -> TensorArrayData a
+    -> TensorArrayData b
+buildPrimFun f adata =
+  case f of
     PrimAdd t     -> A.uncurry @b @b @(TensorArrayData b) (A.add t) adata
-
-
-unsupported :: String -> a
-unsupported thing = error (printf "Not supported: %s" thing)
-
-infixr 0 $$
-($$) :: (b -> a) -> (c -> d -> b) -> c -> d -> a
-(f $$ g) x y = f (g x y)
+    PrimMul t     -> A.uncurry @b @b @(TensorArrayData b) (A.mul t) adata
 
