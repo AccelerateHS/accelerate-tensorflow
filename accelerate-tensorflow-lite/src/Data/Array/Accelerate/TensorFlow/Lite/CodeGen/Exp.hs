@@ -31,7 +31,7 @@ buildOpenExp
     :: forall env aenv sh t.
        TensorShape sh
     -> Val env
-    -> Val aenv
+    -> Aval aenv
     -> OpenExp env aenv t
     -> TensorArrayData t
 buildOpenExp sh env aenv =

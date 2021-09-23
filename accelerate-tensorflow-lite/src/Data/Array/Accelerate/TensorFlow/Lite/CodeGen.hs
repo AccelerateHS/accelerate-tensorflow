@@ -17,11 +17,12 @@ module Data.Array.Accelerate.TensorFlow.Lite.CodeGen
   where
 
 import Data.Array.Accelerate.TensorFlow.Lite.CodeGen.Base
-import Data.Array.Accelerate.TensorFlow.Lite.CodeGen.Environment
 import Data.Array.Accelerate.TensorFlow.Lite.CodeGen.Exp
 import Data.Array.Accelerate.TensorFlow.Lite.CodeGen.Tensor
+import Data.Array.Accelerate.TensorFlow.Lite.CodeGen.Environment
 
 import Data.Array.Accelerate.AST
+import Data.Array.Accelerate.AST.Var
 import Data.Array.Accelerate.Array.Data
 import Data.Array.Accelerate.Array.Unique
 import Data.Array.Accelerate.Lifetime
@@ -45,18 +46,24 @@ import Foreign.ForeignPtr
 import Foreign.Storable
 
 
-buildAcc :: Acc (Array sh e) -> Tensor sh e
-buildAcc acc = buildOpenAcc Empty acc
+buildAcc :: Acc a -> Tensors a
+buildAcc acc = buildOpenAcc Aempty acc
 
 buildOpenAcc
-    :: forall aenv sh e.
-       Val aenv
-    -> OpenAcc aenv (Array sh e)
-    -> Tensor sh e
+    :: forall aenv arrs.
+       Aval aenv
+    -> OpenAcc aenv arrs
+    -> Tensors arrs
 buildOpenAcc aenv (OpenAcc pacc) =
   let
       buildA :: OpenAcc aenv (Array sh' e') -> Tensor sh' e'
       buildA = buildOpenAcc aenv
+
+      aletL :: ALeftHandSide bnd aenv aenv'
+            -> OpenAcc aenv  bnd
+            -> OpenAcc aenv' body
+            -> Tensors body
+      aletL lhs bnd body = buildOpenAcc (aenv `apush` (lhs, buildOpenAcc aenv bnd)) body
 
       useL :: ArrayR (Array sh e)
            -> Array sh e
@@ -115,14 +122,52 @@ buildOpenAcc aenv (OpenAcc pacc) =
         Tensor (ArrayR shR adataR) sh' adata'
 
       mapL :: TypeR b -> Fun aenv (a -> b) -> OpenAcc aenv (Array sh a) -> Tensor sh b
-      mapL bR (Lam lhs (Body b)) xs =
+      mapL bR (Lam lhs (Body e)) xs =
         let Tensor (ArrayR shR _) sh xs' = buildA xs
-            xs''                         = buildOpenExp sh (Empty `push` (lhs, xs')) aenv b
+            bs                           = buildOpenExp sh (Empty `push` (lhs, xs')) aenv e
         in
-        Tensor (ArrayR shR bR) sh xs''
+        Tensor (ArrayR shR bR) sh bs
       mapL _ _ _ = error "impossible"
+
+      -- XXX Assumes that the tensors have compatible shape!
+      zipWithL :: TypeR c
+               -> Fun aenv (a -> b -> c)
+               -> OpenAcc aenv (Array sh a)
+               -> OpenAcc aenv (Array sh b)
+               -> Tensor sh c
+      zipWithL cR (Lam lhsA (Lam lhsB (Body e))) xs ys =
+        let Tensor (ArrayR shR _) sh xs' = buildA xs
+            Tensor _              _  ys' = buildA ys
+            cs                           = buildOpenExp sh (Empty `push` (lhsA, xs') `push` (lhsB, ys')) aenv e
+        in
+        Tensor (ArrayR shR cR) sh cs
+      zipWithL _ _ _ _ = error "impossible"
   in
   case pacc of
+    Alet lhs bnd body                 -> aletL lhs bnd body
+    Avar (Var _ ix)                   -> aprj ix aenv
+    Apair xs ys                       -> (buildOpenAcc aenv xs, buildOpenAcc aenv ys)
+    Anil                              -> ()
+    -- Apply aR f xs                     -> undefined
+    -- Aforeign aR asm f xs              -> undefined
+    -- Acond p xs ys                     -> undefined
+    -- Awhile p f xs                     -> undefined
+    -- Atrace m xs ys                    -> undefined
     Use aR xs                         -> useL aR xs
+    -- Unit eR e                         -> undefined
+    -- Reshape shR sh a                  -> undefined
+    -- Generate aR sh f                  -> undefined
+    -- Transform aR sh p f xs            -> undefined
+    -- Replicate slice slix sl           -> undefined
+    -- Slice sliceIndex sh slix          -> undefined
     Map bR f xs                       -> mapL bR f xs
+    ZipWith cR f xs ys                -> zipWithL cR f xs ys
+    -- Fold f z xs                       -> undefined
+    -- FoldSeg iR f z xs ss              -> undefined
+    -- Scan dir f z xs                   -> undefined
+    -- Scan' dir f z xs                  -> undefined
+    -- Permute f d p xs                  -> undefined
+    -- Backpermute shR sh p xs           -> undefined
+    -- Stencil sR tR f b xs              -> undefined
+    -- Stencil2 sR1 sR2 tR f b1 xs b2 ys -> undefined
 

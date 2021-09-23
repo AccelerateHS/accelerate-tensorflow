@@ -1,5 +1,7 @@
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE FlexibleInstances     #-}
 -- |
 -- Module      : Data.Array.Accelerate.TensorFlow.Lite.CodeGen.Tensor
 -- Copyright   : [2021] The Accelerate Team
@@ -45,6 +47,11 @@ data Tensor sh e where
          -> TensorShape sh
          -> TensorArrayData e
          -> Tensor sh e
+
+type family Tensors t where
+  Tensors ()           = ()
+  Tensors (Array sh e) = Tensor sh e
+  Tensors (a, b)       = (Tensors a, Tensors b)
 
 instance TF.Nodes (Tensor sh e) where
   getNodes (Tensor (ArrayR _ adataR) sh adata) = TF.nodesUnion [ TF.getNodes sh, go adataR adata ]
@@ -130,4 +137,10 @@ instance TF.Fetchable (Tensor sh e) (Array sh e) where
           floating TypeFloat  = wrap
           floating TypeDouble = wrap
           floating TypeHalf   = unsupported "half-precision floating point"
+
+instance TF.Nodes () where
+  getNodes () = return Set.empty
+
+instance TF.Fetchable () () where
+  getFetch () = pure (pure ())
 
