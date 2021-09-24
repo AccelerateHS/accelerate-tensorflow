@@ -1,3 +1,5 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications    #-}
 {-# OPTIONS_HADDOCK hide #-}
 -- |
 -- Module      : Data.Array.Accelerate.TensorFlow.CodeGen.Base
@@ -12,6 +14,8 @@
 module Data.Array.Accelerate.TensorFlow.CodeGen.Base
   where
 
+import Data.Proxy
+import Data.Typeable
 import Text.Printf
 
 
@@ -19,6 +23,9 @@ infixr 0 $$
 ($$) :: (b -> a) -> (c -> d -> b) -> c -> d -> a
 (f $$ g) x y = f (g x y)
 
-unsupported :: String -> a
+unsupported :: String -> t a
 unsupported thing = error (printf "Not supported: %s" thing)
+
+excluded :: forall a t. Typeable a => t a
+excluded = error (printf "Excluded type case: %s" (showsTypeRep (typeRep (Proxy @a)) ""))
 

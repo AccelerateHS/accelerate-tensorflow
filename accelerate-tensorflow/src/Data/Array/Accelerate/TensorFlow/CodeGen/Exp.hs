@@ -122,8 +122,68 @@ buildPrimFun
        PrimFun (a -> b)
     -> TensorArrayData a
     -> TensorArrayData b
-buildPrimFun f adata =
+buildPrimFun f =
   case f of
-    PrimAdd t     -> A.uncurry @b @b @(TensorArrayData b) (A.add t) adata
-    PrimMul t     -> A.uncurry @b @b @(TensorArrayData b) (A.mul t) adata
+    PrimAdd t               -> A.add t
+    PrimSub t               -> A.sub t
+    PrimMul t               -> A.mul t
+    PrimNeg t               -> A.neg t
+    PrimAbs t               -> A.abs t
+    PrimSig t               -> A.signum t
+    PrimQuot t              -> A.quot t
+    PrimRem t               -> A.rem t
+    PrimQuotRem t           -> A.quotRem t
+    -- PrimIDiv     :: IntegralType a -> PrimFun ((a, a)   -> a)
+    -- PrimMod      :: IntegralType a -> PrimFun ((a, a)   -> a)
+    -- PrimDivMod   :: IntegralType a -> PrimFun ((a, a)   -> (a, a))
+    PrimBAnd t              -> A.band t
+    PrimBOr t               -> A.bor t
+    PrimBXor t              -> A.xor t
+    PrimBNot t              -> A.complement t
+    PrimBShiftL t           -> A.shiftL t
+    PrimBShiftR t           -> A.shiftR t
+    -- PrimBRotateL           :: IntegralType a -> PrimFun ((a, Int) -> a)
+    -- PrimBRotateR           :: IntegralType a -> PrimFun ((a, Int) -> a)
+    PrimPopCount t          -> A.popCount t
+    -- PrimCountLeadingZeros  :: IntegralType a -> PrimFun (a -> Int)
+    -- PrimCountTrailingZeros :: IntegralType a -> PrimFun (a -> Int)
+    PrimFDiv t              -> A.fdiv t
+    PrimRecip t             -> A.recip t
+    PrimSin t               -> A.sin t
+    PrimCos t               -> A.cos t
+    PrimTan t               -> A.tan t
+    PrimAsin t              -> A.asin t
+    PrimAcos t              -> A.acos t
+    PrimAtan t              -> A.atan t
+    PrimSinh t              -> A.sinh t
+    PrimCosh t              -> A.cosh t
+    PrimTanh t              -> A.tanh t
+    PrimAsinh t             -> A.asinh t
+    PrimAcosh t             -> A.acosh t
+    PrimAtanh t             -> A.atanh t
+    PrimExpFloating t       -> A.exp t
+    PrimSqrt t              -> A.sqrt t
+    PrimLog t               -> A.log t
+    PrimFPow t              -> A.fpow t
+    PrimLogBase t           -> A.logBase t
+    PrimTruncate ta tb      -> A.truncate ta tb
+    PrimRound ta tb         -> A.round ta tb
+    PrimFloor ta tb         -> A.floor ta tb
+    PrimCeiling ta tb       -> A.ceiling ta tb
+    PrimAtan2 t             -> A.atan2 t
+    PrimIsNaN t             -> A.isNaN t
+    PrimIsInfinite t        -> A.isInfinite t
+    PrimLt t                -> A.lt t
+    PrimGt t                -> A.gt t
+    PrimLtEq t              -> A.lte t
+    PrimGtEq t              -> A.gte t
+    PrimEq t                -> A.eq t
+    PrimNEq t               -> A.neq t
+    PrimMax t               -> A.max t
+    PrimMin t               -> A.min t
+    PrimLAnd                -> A.uncurry @PrimBool @PrimBool A.land
+    PrimLOr                 -> A.uncurry @PrimBool @PrimBool A.lor
+    PrimLNot                -> A.lnot
+    PrimFromIntegral ta tb  -> A.fromIntegral ta tb
+    PrimToFloating ta tb    -> A.toFloating ta tb
 

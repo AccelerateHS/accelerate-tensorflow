@@ -1,7 +1,9 @@
+{-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeFamilies          #-}
-{-# LANGUAGE FlexibleInstances     #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_HADDOCK hide #-}
 -- |
@@ -33,6 +35,8 @@ import qualified TensorFlow.Types                                   as TF
 import qualified TensorFlow.Internal.FFI                            as TF
 
 import Control.Applicative                                          ( liftA, liftA2 )
+import Data.Bits
+import Data.Primitive.Vec                                           ( Vec )
 import Data.Set                                                     ( Set )
 import Foreign.ForeignPtr
 import Foreign.Storable
@@ -41,14 +45,43 @@ import qualified Data.Set                                           as Set
 import qualified Data.Vector.Storable                               as V
 
 
-type TensorShape sh    = TF.Tensor TF.Build Int64
-type TensorArrayData e = GArrayDataR (TF.Tensor TF.Build) e
-
 data Tensor sh e where
   Tensor :: ArrayR (Array sh e)
          -> TensorShape sh
          -> TensorArrayData e
          -> Tensor sh e
+
+type TensorShape sh    = TF.Tensor TF.Build Int64
+type TensorArrayData e = TArrayDataR (TF.Tensor TF.Build) e
+
+type ScalarTensorArrayData e = TensorArrayData e ~ TF.Tensor TF.Build e
+
+type family TArrayDataR ba a where
+  TArrayDataR ba ()     = ()
+  TArrayDataR ba (a, b) = (TArrayDataR ba a, TArrayDataR ba b)
+  TArrayDataR ba a      = ba (ScalarTensorDataR a)
+
+type family ScalarTensorDataR t where
+  ScalarTensorDataR Int       = $( case finiteBitSize (undefined :: Int) of
+                                     32 -> [t| Int32 |]
+                                     64 -> [t| Int64 |]
+                                     _  -> error "expected 32- or 64-bit integer type" )
+  ScalarTensorDataR Int8      = Int8
+  ScalarTensorDataR Int16     = Int16
+  ScalarTensorDataR Int32     = Int32
+  ScalarTensorDataR Int64     = Int64
+  ScalarTensorDataR Word      = $( case finiteBitSize (undefined :: Word) of
+                                     32 -> [t| Word32 |]
+                                     64 -> [t| Word64 |]
+                                     _  -> error "expected 32- or 64-bit unsigned integer type" )
+  ScalarTensorDataR Word8     = Word8
+  ScalarTensorDataR Word16    = Word16
+  ScalarTensorDataR Word32    = Word32
+  ScalarTensorDataR Word64    = Word64
+  ScalarTensorDataR Half      = Half
+  ScalarTensorDataR Float     = Float
+  ScalarTensorDataR Double    = Double
+  ScalarTensorDataR (Vec n t) = ScalarTensorDataR t
 
 type family Tensors t where
   Tensors ()           = ()
