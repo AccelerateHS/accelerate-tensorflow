@@ -4,7 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications    #-}
 -- |
--- Module      : Data.Array.Accelerate.TensorFlow.Lite.CodeGen
+-- Module      : Data.Array.Accelerate.TensorFlow.CodeGen
 -- Copyright   : [2021] The Accelerate Team
 -- License     : BSD3
 --
@@ -13,13 +13,13 @@
 -- Portability : non-portable (GHC extensions)
 --
 
-module Data.Array.Accelerate.TensorFlow.Lite.CodeGen
+module Data.Array.Accelerate.TensorFlow.CodeGen
   where
 
-import Data.Array.Accelerate.TensorFlow.Lite.CodeGen.Base
-import Data.Array.Accelerate.TensorFlow.Lite.CodeGen.Exp
-import Data.Array.Accelerate.TensorFlow.Lite.CodeGen.Tensor
-import Data.Array.Accelerate.TensorFlow.Lite.CodeGen.Environment
+import Data.Array.Accelerate.TensorFlow.CodeGen.Base
+import Data.Array.Accelerate.TensorFlow.CodeGen.Exp
+import Data.Array.Accelerate.TensorFlow.CodeGen.Tensor
+import Data.Array.Accelerate.TensorFlow.CodeGen.Environment
 
 import Data.Array.Accelerate.AST
 import Data.Array.Accelerate.AST.Var

@@ -22,17 +22,17 @@ description:        Please see the README on GitHub at <https://github.com/tmcdo
 dependencies:
 - base                          >= 4.7 && < 5
 - accelerate                    == 1.3.*
-- bytestring
-- containers
-- lens-family
-- proto-lens
+- accelerate-tensorflow
 - tensorflow
-- tensorflow-ops
-- tensorflow-core-ops
 - tensorflow-proto
-- vector
+- proto-lens
+- lens-family
+- bytestring
 
 library:
   source-dirs: src
+  ghc-options:
+    - -Wall
+    - -O2
 
 # vim: nospell

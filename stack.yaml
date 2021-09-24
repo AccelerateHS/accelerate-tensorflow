@@ -7,7 +7,7 @@
 resolver: lts-18.8
 
 packages:
-# - accelerate-tensorflow
+- accelerate-tensorflow
 - accelerate-tensorflow-lite
 
 extra-deps:

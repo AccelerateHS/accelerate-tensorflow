@@ -2,8 +2,10 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE FlexibleInstances     #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_HADDOCK hide #-}
 -- |
--- Module      : Data.Array.Accelerate.TensorFlow.Lite.CodeGen.Tensor
+-- Module      : Data.Array.Accelerate.TensorFlow.CodeGen.Tensor
 -- Copyright   : [2021] The Accelerate Team
 -- License     : BSD3
 --
@@ -12,10 +14,10 @@
 -- Portability : non-portable (GHC extensions)
 --
 
-module Data.Array.Accelerate.TensorFlow.Lite.CodeGen.Tensor
+module Data.Array.Accelerate.TensorFlow.CodeGen.Tensor
   where
 
-import Data.Array.Accelerate.TensorFlow.Lite.CodeGen.Base
+import Data.Array.Accelerate.TensorFlow.CodeGen.Base
 
 import Data.Array.Accelerate.Array.Data
 import Data.Array.Accelerate.Array.Unique

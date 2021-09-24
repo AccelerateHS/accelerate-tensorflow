@@ -1,6 +1,7 @@
 {-# LANGUAGE GADTs #-}
+{-# OPTIONS_HADDOCK hide #-}
 -- |
--- Module      : Data.Array.Accelerate.TensorFlow.Lite.CodeGen.Environment
+-- Module      : Data.Array.Accelerate.TensorFlow.CodeGen.Environment
 -- Copyright   : [2021] The Accelerate Team
 -- License     : BSD3
 --
@@ -9,10 +10,10 @@
 -- Portability : non-portable (GHC extensions)
 --
 
-module Data.Array.Accelerate.TensorFlow.Lite.CodeGen.Environment
+module Data.Array.Accelerate.TensorFlow.CodeGen.Environment
   where
 
-import Data.Array.Accelerate.TensorFlow.Lite.CodeGen.Tensor
+import Data.Array.Accelerate.TensorFlow.CodeGen.Tensor
 
 import Data.Array.Accelerate.AST
 import Data.Array.Accelerate.AST.Idx

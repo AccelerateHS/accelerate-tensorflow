@@ -2,8 +2,9 @@
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications    #-}
+{-# OPTIONS_HADDOCK hide #-}
 -- |
--- Module      : Data.Array.Accelerate.TensorFlow.Lite.CodeGen.Exp
+-- Module      : Data.Array.Accelerate.TensorFlow.CodeGen.Exp
 -- Copyright   : [2021] The Accelerate Team
 -- License     : BSD3
 --
@@ -12,13 +13,13 @@
 -- Portability : non-portable (GHC extensions)
 --
 
-module Data.Array.Accelerate.TensorFlow.Lite.CodeGen.Exp
+module Data.Array.Accelerate.TensorFlow.CodeGen.Exp
   where
 
-import Data.Array.Accelerate.TensorFlow.Lite.CodeGen.Base
-import Data.Array.Accelerate.TensorFlow.Lite.CodeGen.Tensor
-import Data.Array.Accelerate.TensorFlow.Lite.CodeGen.Environment
-import Data.Array.Accelerate.TensorFlow.Lite.CodeGen.Arithmetic     as A
+import Data.Array.Accelerate.TensorFlow.CodeGen.Arithmetic          as A
+import Data.Array.Accelerate.TensorFlow.CodeGen.Base
+import Data.Array.Accelerate.TensorFlow.CodeGen.Environment
+import Data.Array.Accelerate.TensorFlow.CodeGen.Tensor
 
 import Data.Array.Accelerate.AST
 import Data.Array.Accelerate.AST.Var

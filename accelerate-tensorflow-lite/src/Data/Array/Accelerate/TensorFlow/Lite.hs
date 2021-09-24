@@ -23,9 +23,9 @@ import Data.Array.Accelerate.Trafo.Sharing
 import Data.Array.Accelerate.Type
 import qualified Data.Array.Accelerate.Representation.Array         as R
 
-import Data.Array.Accelerate.TensorFlow.Lite.CodeGen
-import Data.Array.Accelerate.TensorFlow.Lite.CodeGen.Base
-import Data.Array.Accelerate.TensorFlow.Lite.CodeGen.Tensor
+import Data.Array.Accelerate.TensorFlow.CodeGen
+import Data.Array.Accelerate.TensorFlow.CodeGen.Base
+import Data.Array.Accelerate.TensorFlow.CodeGen.Tensor
 
 import qualified TensorFlow.Build                                   as TF
 import qualified TensorFlow.Core                                    as TF
@@ -35,16 +35,8 @@ import qualified Proto.Tensorflow.Core.Framework.Graph_Fields       as TF
 import Data.Functor.Identity
 import Data.ProtoLens
 import Lens.Family2
-import System.IO.Unsafe
 import qualified Data.ByteString                                    as B
 
-
-run :: forall arrs. Arrays arrs => Acc arrs -> arrs
-run | FetchableDict <- fetchableDict @arrs
-    = toArr
-    . unsafePerformIO . TF.runSession . TF.run
-    . buildAcc
-    . convertAcc
 
 save_model :: forall arrs. Arrays arrs => FilePath -> Acc arrs -> IO ()
 save_model path acc =
@@ -95,19 +87,4 @@ save_model path acc =
       graph = defMessage & TF.node .~ nodes :: TF.GraphDef
   in
   B.writeFile path (encodeMessage graph)
-
-data FetchableDict t where
-  FetchableDict :: TF.Fetchable (Tensors t) t => FetchableDict t
-
-fetchableDict :: forall arrs. Arrays arrs => FetchableDict (ArraysR arrs)
-fetchableDict =
-  let go :: R.ArraysR a -> FetchableDict a
-      go TupRunit                = FetchableDict
-      go (TupRsingle R.ArrayR{}) = FetchableDict
-      go (TupRpair aR bR)
-        | FetchableDict <- go aR
-        , FetchableDict <- go bR
-        = FetchableDict
-  in
-  go (arraysR @arrs)
 

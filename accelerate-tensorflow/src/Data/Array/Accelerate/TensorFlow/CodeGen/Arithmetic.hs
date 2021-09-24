@@ -1,7 +1,8 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE GADTs               #-}
+{-# OPTIONS_HADDOCK hide #-}
 -- |
--- Module      : Data.Array.Accelerate.TensorFlow.Lite.CodeGen.Arithmetic
+-- Module      : Data.Array.Accelerate.TensorFlow.CodeGen.Arithmetic
 -- Copyright   : [2021] The Accelerate Team
 -- License     : BSD3
 --
@@ -10,11 +11,11 @@
 -- Portability : non-portable (GHC extensions)
 --
 
-module Data.Array.Accelerate.TensorFlow.Lite.CodeGen.Arithmetic
+module Data.Array.Accelerate.TensorFlow.CodeGen.Arithmetic
   where
 
-import Data.Array.Accelerate.TensorFlow.Lite.CodeGen.Base
-import Data.Array.Accelerate.TensorFlow.Lite.CodeGen.Tensor
+import Data.Array.Accelerate.TensorFlow.CodeGen.Base
+import Data.Array.Accelerate.TensorFlow.CodeGen.Tensor
 
 import Data.Array.Accelerate.Type
 

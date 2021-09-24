@@ -1,5 +1,6 @@
+{-# OPTIONS_HADDOCK hide #-}
 -- |
--- Module      : Data.Array.Accelerate.TensorFlow.Lite.CodeGen.Base
+-- Module      : Data.Array.Accelerate.TensorFlow.CodeGen.Base
 -- Copyright   : [2021] The Accelerate Team
 -- License     : BSD3
 --
@@ -8,7 +9,7 @@
 -- Portability : non-portable (GHC extensions)
 --
 
-module Data.Array.Accelerate.TensorFlow.Lite.CodeGen.Base
+module Data.Array.Accelerate.TensorFlow.CodeGen.Base
   where
 
 import Text.Printf

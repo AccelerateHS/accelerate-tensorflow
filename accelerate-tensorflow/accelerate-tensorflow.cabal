@@ -26,12 +26,28 @@ source-repository head
 
 library
   exposed-modules:
-      Data.Array.Accelerate.TensorFlow.Vectorise
+      Data.Array.Accelerate.TensorFlow
+      Data.Array.Accelerate.TensorFlow.CodeGen
+      Data.Array.Accelerate.TensorFlow.CodeGen.Arithmetic
+      Data.Array.Accelerate.TensorFlow.CodeGen.Base
+      Data.Array.Accelerate.TensorFlow.CodeGen.Environment
+      Data.Array.Accelerate.TensorFlow.CodeGen.Exp
+      Data.Array.Accelerate.TensorFlow.CodeGen.Tensor
   other-modules:
       Paths_accelerate_tensorflow
   hs-source-dirs:
       src
+  ghc-options: -Wall -O2
   build-depends:
       accelerate ==1.3.*
     , base >=4.7 && <5
+    , bytestring
+    , containers
+    , lens-family
+    , proto-lens
+    , tensorflow
+    , tensorflow-core-ops
+    , tensorflow-ops
+    , tensorflow-proto
+    , vector
   default-language: Haskell2010
