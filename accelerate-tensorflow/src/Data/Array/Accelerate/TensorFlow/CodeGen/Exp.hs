@@ -23,9 +23,11 @@ import Data.Array.Accelerate.TensorFlow.CodeGen.Tensor
 
 import Data.Array.Accelerate.AST
 import Data.Array.Accelerate.AST.Var
+import Data.Array.Accelerate.Representation.Type
 import Data.Array.Accelerate.Type
 
 import qualified TensorFlow.Ops                                     as TF
+import qualified TensorFlow.GenOps.Core                             as TF
 
 
 buildOpenExp
@@ -39,21 +41,65 @@ buildOpenExp sh env aenv =
   let
       buildE :: OpenExp env aenv s -> TensorArrayData s
       buildE = buildOpenExp sh env aenv
+
+      condL :: OpenExp env aenv PrimBool
+            -> OpenExp env aenv t
+            -> OpenExp env aenv t
+            -> TensorArrayData t
+      condL p t e =
+        let p' = TF.cast @_ @_ @Bool $ buildE p
+            t' = buildE t
+            e' = buildE e
+
+            go :: TypeR s -> TensorArrayData s -> TensorArrayData s -> TensorArrayData s
+            go TupRunit         ()       ()       = ()
+            go (TupRpair tA tB) (a1, b1) (a2, b2) = (go tA a1 a2, go tB b1 b2)
+            go (TupRsingle eR)  a        b        = scalar eR a b
+
+            scalar :: ScalarType s -> TensorArrayData s -> TensorArrayData s -> TensorArrayData s
+            scalar (SingleScalarType s) = single s
+            scalar (VectorScalarType _) = unsupported "SIMD-vector types"
+
+            single :: SingleType s -> TensorArrayData s -> TensorArrayData s -> TensorArrayData s
+            single (NumSingleType s) = num s
+
+            num :: NumType s -> TensorArrayData s -> TensorArrayData s -> TensorArrayData s
+            num (IntegralNumType s) = integral s
+            num (FloatingNumType s) = floating s
+
+            integral :: IntegralType s -> TensorArrayData s -> TensorArrayData s -> TensorArrayData s
+            integral TypeInt    = TF.selectV2 p'
+            integral TypeInt8   = TF.selectV2 p'
+            integral TypeInt16  = TF.selectV2 p'
+            integral TypeInt32  = TF.selectV2 p'
+            integral TypeInt64  = TF.selectV2 p'
+            integral TypeWord   = TF.selectV2 p'
+            integral TypeWord8  = TF.selectV2 p'
+            integral TypeWord16 = TF.selectV2 p'
+            integral TypeWord32 = TF.selectV2 p'
+            integral TypeWord64 = TF.selectV2 p'
+
+            floating :: FloatingType s -> TensorArrayData s -> TensorArrayData s -> TensorArrayData s
+            floating TypeFloat  = TF.selectV2 p'
+            floating TypeDouble = TF.selectV2 p'
+            floating TypeHalf   = unsupported "half-precision floating point"
+        in
+        go (expType t) t' e'
   in
   \case
     Let lhs bnd body              -> buildOpenExp sh (env `push` (lhs, buildE bnd)) aenv body
     Evar (Var _ ix)               -> prj ix env
     -- Foreign tR asm f x            -> undefined
     Pair x y                      -> (buildE x, buildE y)
-    -- Nil                           -> undefined
-    -- VecPack vR x                  -> undefined
-    -- VecUnpack vR x                -> undefined
+    Nil                           -> ()
+    VecPack{}                     -> unsupported "SIMD-vector types"
+    VecUnpack{}                   -> unsupported "SIMD-vector types"
     -- IndexSlice sliceIndex slix sh -> undefined
     -- IndexFull sliceIndex slix sl  -> undefined
     -- ToIndex shR sh ix             -> undefined
     -- FromIndex shR sh i            -> undefined
     -- Case tag xs x                 -> undefined
-    -- Cond p t e                    -> undefined
+    Cond p t e                    -> condL p t e
     -- While p f x                   -> undefined
     Const t c                     -> buildConst sh t c
     PrimConst x                   -> buildPrimConst sh x
@@ -100,7 +146,7 @@ buildConst sh = scalar
     num (FloatingNumType t) = floating t
 
     integral :: IntegralType t -> t -> TensorArrayData t
-    integral TypeInt8   = TF.fill sh . TF.scalar
+    integral TypeInt8   = TF.fill sh . TF.scalar  -- XXX: is the fill necessary? actually no...
     integral TypeInt16  = TF.fill sh . TF.scalar
     integral TypeInt32  = TF.fill sh . TF.scalar
     integral TypeInt64  = TF.fill sh . TF.scalar

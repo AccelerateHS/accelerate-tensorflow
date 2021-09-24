@@ -23,7 +23,7 @@ infixr 0 $$
 ($$) :: (b -> a) -> (c -> d -> b) -> c -> d -> a
 (f $$ g) x y = f (g x y)
 
-unsupported :: String -> t a
+unsupported :: String -> a
 unsupported thing = error (printf "Not supported: %s" thing)
 
 excluded :: forall a t. Typeable a => t a
