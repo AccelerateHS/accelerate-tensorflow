@@ -29,6 +29,7 @@ library
       Data.Array.Accelerate.TensorFlow
       Data.Array.Accelerate.TensorFlow.CodeGen
       Data.Array.Accelerate.TensorFlow.CodeGen.Arithmetic
+      Data.Array.Accelerate.TensorFlow.CodeGen.AST
       Data.Array.Accelerate.TensorFlow.CodeGen.Base
       Data.Array.Accelerate.TensorFlow.CodeGen.Environment
       Data.Array.Accelerate.TensorFlow.CodeGen.Exp
@@ -44,10 +45,12 @@ library
     , bytestring
     , containers
     , lens-family
+    , mtl
     , proto-lens
     , tensorflow
     , tensorflow-core-ops
     , tensorflow-ops
     , tensorflow-proto
+    , text
     , vector
   default-language: Haskell2010

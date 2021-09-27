@@ -25,11 +25,13 @@ dependencies:
 - bytestring
 - containers
 - lens-family
+- mtl
 - proto-lens
 - tensorflow
-- tensorflow-ops
 - tensorflow-core-ops
+- tensorflow-ops
 - tensorflow-proto
+- text
 - vector
 
 library:

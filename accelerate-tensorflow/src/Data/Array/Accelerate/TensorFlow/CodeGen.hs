@@ -1,8 +1,11 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications    #-}
+{-# OPTIONS_HADDOCK hide #-}
 -- |
 -- Module      : Data.Array.Accelerate.TensorFlow.CodeGen
 -- Copyright   : [2021] The Accelerate Team
@@ -13,15 +16,21 @@
 -- Portability : non-portable (GHC extensions)
 --
 
-module Data.Array.Accelerate.TensorFlow.CodeGen
-  where
+module Data.Array.Accelerate.TensorFlow.CodeGen (
 
+  buildAcc,
+  buildAfun,
+
+) where
+
+import Data.Array.Accelerate.TensorFlow.CodeGen.AST
 import Data.Array.Accelerate.TensorFlow.CodeGen.Base
+import Data.Array.Accelerate.TensorFlow.CodeGen.Environment
 import Data.Array.Accelerate.TensorFlow.CodeGen.Exp
 import Data.Array.Accelerate.TensorFlow.CodeGen.Tensor
-import Data.Array.Accelerate.TensorFlow.CodeGen.Environment
 
 import Data.Array.Accelerate.AST
+import Data.Array.Accelerate.AST.LeftHandSide
 import Data.Array.Accelerate.AST.Var
 import Data.Array.Accelerate.Array.Data
 import Data.Array.Accelerate.Array.Unique
@@ -31,23 +40,138 @@ import Data.Array.Accelerate.Representation.Shape
 import Data.Array.Accelerate.Representation.Type
 import Data.Array.Accelerate.Type
 
-import Lens.Family2
 import Data.ProtoLens.Default                                       ( def )
+import Lens.Family2
 import qualified Proto.Tensorflow.Core.Framework.Tensor             as TF
 import qualified Proto.Tensorflow.Core.Framework.TensorShape_Fields as TensorShape
 import qualified Proto.Tensorflow.Core.Framework.Tensor_Fields      as TF
+import qualified TensorFlow.Build                                   as TF
 import qualified TensorFlow.Core                                    as TF
 import qualified TensorFlow.GenOps.Core                             as TF
-import qualified TensorFlow.Ops                                     as TF
+import qualified TensorFlow.Ops                                     as TF hiding ( placeholder' )
 import qualified TensorFlow.Types                                   as TF
 
+import Control.Monad.State
 import Data.ByteString.Internal                                     as B
 import Foreign.ForeignPtr
 import Foreign.Storable
+import Text.Printf
+import qualified Data.Text                                          as T
 
 
 buildAcc :: Acc a -> Tensors a
 buildAcc acc = buildOpenAcc Aempty acc
+
+buildAfun :: Afun f -> Tfun f
+buildAfun f = evalState (buildOpenAfun Aempty f) 0
+
+buildOpenAfun :: Aval aenv -> OpenAfun aenv f -> State Int (OpenTfun aenv f)
+-- buildOpenAfun aenv (Abody f)    = return (Tbody (arraysR f) (buildOpenAcc aenv f))
+buildOpenAfun aenv (Alam lhs f) = do
+  let
+      go :: ALeftHandSide t aenv aenv' -> Aval aenv -> State Int (Aval aenv')
+      go LeftHandSideWildcard{}               env = return env
+      go (LeftHandSidePair aR bR)             env = go bR =<< go aR env
+      go (LeftHandSideSingle (ArrayR shR eR)) env = state $ \i ->
+        let sh    = TF.placeholder' (TF.opName .~ TF.explicitName (T.pack (printf "shape_%d" i)))
+            adata = evalState (array eR) 0
+
+            array :: TypeR t -> State Int (TensorArrayData t)
+            array TupRunit         = return ()
+            array (TupRpair aR bR) = (,) <$> array aR <*> array bR
+            array (TupRsingle aR)  = scalar aR
+
+            scalar :: ScalarType t -> State Int (TensorArrayData t)
+            scalar (SingleScalarType t) = single t
+            scalar (VectorScalarType _) = unsupported "SIMD-vector types"
+
+            single :: SingleType t -> State Int (TensorArrayData t)
+            single (NumSingleType t) = num t
+
+            num :: NumType t -> State Int (TensorArrayData t)
+            num (IntegralNumType t) = integral t
+            num (FloatingNumType t) = floating t
+
+            integral :: IntegralType t -> State Int (TensorArrayData t)
+            integral TypeInt8   = placeholder
+            integral TypeInt16  = placeholder
+            integral TypeInt32  = placeholder
+            integral TypeInt64  = placeholder
+            integral TypeWord8  = placeholder
+            integral TypeWord16 = placeholder
+            integral TypeWord32 = placeholder
+            integral TypeWord64 = placeholder
+            integral TypeInt    = placeholder
+            integral TypeWord   = placeholder
+
+            floating :: FloatingType t -> State Int (TensorArrayData t)
+            floating TypeFloat  = placeholder
+            floating TypeDouble = placeholder
+            floating TypeHalf   = unsupported "half-precision floating point"
+
+            placeholder :: TF.TensorType t => State Int (TF.Tensor TF.Build t)
+            placeholder = state $ \j ->
+              (TF.placeholder' (TF.opName .~ TF.explicitName (T.pack (printf "input_%d_%d" i j))), j+1)
+        in
+        (env `Apush` Tensor (ArrayR shR eR) sh adata, i+1)
+
+  --
+  aenv' <- go lhs aenv
+  f'    <- buildOpenAfun aenv' f
+  return $ Tlam lhs f'
+--
+buildOpenAfun aenv (Abody f) =
+  let
+      go :: ArraysR t -> Tensors t -> State Int (Tensors t)
+      go TupRunit              ()                                = return ()
+      go (TupRpair aR bR)      (a, b)                            = (,) <$> go aR a <*> go bR b
+      go (TupRsingle ArrayR{}) (Tensor (ArrayR shR eR) sh adata) = state $ \i ->
+        let sh'    = TF.identity' (TF.opName .~ TF.explicitName (T.pack (printf "output_shape_%d" i))) sh
+            adata' = evalState (array eR adata) 0
+
+            array :: TypeR t -> TensorArrayData t -> State Int (TensorArrayData t)
+            array TupRunit         ()     = return ()
+            array (TupRpair aR bR) (a, b) = (,) <$> array aR a <*> array bR b
+            array (TupRsingle aR)  a      = scalar aR a
+
+            scalar :: ScalarType t -> TensorArrayData t -> State Int (TensorArrayData t)
+            scalar (SingleScalarType t) = single t
+            scalar (VectorScalarType _) = unsupported "SIMD-vector types"
+
+            single :: SingleType t -> TensorArrayData t -> State Int (TensorArrayData t)
+            single (NumSingleType t) = num t
+
+            num :: NumType t -> TensorArrayData t -> State Int (TensorArrayData t)
+            num (IntegralNumType t) = integral t
+            num (FloatingNumType t) = floating t
+
+            integral :: IntegralType t -> TensorArrayData t -> State Int (TensorArrayData t)
+            integral TypeInt8   = label
+            integral TypeInt16  = label
+            integral TypeInt32  = label
+            integral TypeInt64  = label
+            integral TypeWord8  = label
+            integral TypeWord16 = label
+            integral TypeWord32 = label
+            integral TypeWord64 = label
+            integral TypeInt    = label
+            integral TypeWord   = label
+
+            floating :: FloatingType t -> TensorArrayData t -> State Int (TensorArrayData t)
+            floating TypeFloat  = label
+            floating TypeDouble = label
+            floating TypeHalf   = unsupported "half-precision floating point"
+
+            label :: TF.TensorType t => TF.Tensor TF.Build t -> State Int (TF.Tensor TF.Build t)
+            label t = state $ \j -> (TF.identity' (TF.opName .~ TF.explicitName (T.pack (printf "output_%d" i))) t, j+1)
+        in
+        (Tensor (ArrayR shR eR) sh' adata', i+1)
+
+      fR  = arraysR f
+      f'  = evalState (go fR (buildOpenAcc aenv f)) 0
+  in
+  return $ Tbody fR f'
+
 
 buildOpenAcc
     :: forall aenv arrs.

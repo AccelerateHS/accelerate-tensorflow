@@ -45,6 +45,11 @@ import qualified Data.Set                                           as Set
 import qualified Data.Vector.Storable                               as V
 
 
+type family Tensors t where
+  Tensors ()           = ()
+  Tensors (Array sh e) = Tensor sh e
+  Tensors (a, b)       = (Tensors a, Tensors b)
+
 data Tensor sh e where
   Tensor :: ArrayR (Array sh e)
          -> TensorShape sh
@@ -82,11 +87,6 @@ type family ScalarTensorDataR t where
   ScalarTensorDataR Float     = Float
   ScalarTensorDataR Double    = Double
   ScalarTensorDataR (Vec n t) = ScalarTensorDataR t
-
-type family Tensors t where
-  Tensors ()           = ()
-  Tensors (Array sh e) = Tensor sh e
-  Tensors (a, b)       = (Tensors a, Tensors b)
 
 instance TF.Nodes (Tensor sh e) where
   getNodes (Tensor (ArrayR _ adataR) sh adata) = TF.nodesUnion [ TF.getNodes sh, go adataR adata ]

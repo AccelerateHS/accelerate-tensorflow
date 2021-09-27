@@ -24,6 +24,7 @@ import Data.Array.Accelerate.Type
 import qualified Data.Array.Accelerate.Representation.Array         as R
 
 import Data.Array.Accelerate.TensorFlow.CodeGen
+import Data.Array.Accelerate.TensorFlow.CodeGen.AST
 import Data.Array.Accelerate.TensorFlow.CodeGen.Base
 import Data.Array.Accelerate.TensorFlow.CodeGen.Tensor
 
@@ -38,8 +39,26 @@ import Lens.Family2
 import qualified Data.ByteString                                    as B
 
 
-save_model :: forall arrs. Arrays arrs => FilePath -> Acc arrs -> IO ()
-save_model path acc =
+saveAcc :: forall arrs. Arrays arrs => FilePath -> Acc arrs -> IO ()
+saveAcc path acc =
+  let model = buildAcc (convertAcc acc)
+   in save_model (arraysR @arrs) path model
+
+saveAfun :: forall f. Afunction f => FilePath -> f -> IO ()
+saveAfun path acc =
+  let model = buildAfun (convertAfun acc)
+
+      go :: AfunctionRepr g (AfunctionR g) (ArraysFunctionR g)
+         -> OpenTfun aenv (ArraysFunctionR g)
+         -> IO ()
+      go AfunctionReprBody       (Tbody bR b) = save_model bR path b
+      go (AfunctionReprLam lamR) (Tlam _ f)   = go lamR f
+      go _                       _            = error "impossible"
+  in
+  go (afunctionRepr @f) model
+
+save_model :: R.ArraysR arrs -> FilePath -> Tensors arrs -> IO ()
+save_model arrR path model =
   let
       go :: forall m a. TF.MonadBuild m => R.ArraysR a -> Tensors a -> m ()
       go TupRunit                ()                           = return ()
@@ -71,8 +90,8 @@ save_model path acc =
       integral TypeWord16 = render
       integral TypeWord32 = render
       integral TypeWord64 = render
-      integral TypeInt    = unsupported "Int (use at a specified bit-size instead)"
-      integral TypeWord   = unsupported "Word (use at a specified bit-size instead)"
+      integral TypeInt    = render
+      integral TypeWord   = render
 
       floating :: TF.MonadBuild m => FloatingType t -> TensorArrayData t -> m ()
       floating TypeFloat  = render
@@ -82,8 +101,7 @@ save_model path acc =
       render :: TF.MonadBuild m => TF.Tensor TF.Build a -> m ()
       render t = TF.render t >> return ()
 
-      model = buildAcc (convertAcc acc)
-      nodes = runIdentity $ TF.evalBuildT (go (arraysR @arrs) model >> TF.flushNodeBuffer)
+      nodes = runIdentity $ TF.evalBuildT (go arrR model >> TF.flushNodeBuffer)
       graph = defMessage & TF.node .~ nodes :: TF.GraphDef
   in
   B.writeFile path (encodeMessage graph)
