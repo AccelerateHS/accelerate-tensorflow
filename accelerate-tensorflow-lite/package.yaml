@@ -23,11 +23,15 @@ dependencies:
 - base                          >= 4.7 && < 5
 - accelerate                    == 1.3.*
 - accelerate-tensorflow
+- bytestring
+- deepseq
+- directory
+- lens-family
+- process
+- proto-lens
 - tensorflow
 - tensorflow-proto
-- proto-lens
-- lens-family
-- bytestring
+- text
 
 library:
   source-dirs: src

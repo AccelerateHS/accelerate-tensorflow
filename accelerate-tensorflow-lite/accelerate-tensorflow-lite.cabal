@@ -27,6 +27,8 @@ source-repository head
 library
   exposed-modules:
       Data.Array.Accelerate.TensorFlow.Lite
+      Data.Array.Accelerate.TensorFlow.Lite.Compile
+      System.Process.Extra
   other-modules:
       Paths_accelerate_tensorflow_lite
   hs-source-dirs:
@@ -37,8 +39,12 @@ library
     , accelerate-tensorflow
     , base >=4.7 && <5
     , bytestring
+    , deepseq
+    , directory
     , lens-family
+    , process
     , proto-lens
     , tensorflow
     , tensorflow-proto
+    , text
   default-language: Haskell2010

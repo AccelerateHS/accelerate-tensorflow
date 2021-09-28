@@ -92,7 +92,7 @@ runN acc =
             go (LeftHandSidePair aR bR)               (a, b)             env = go bR b =<< go aR a env
             go (LeftHandSideSingle (R.ArrayR shR eR)) (R.Array sh adata) env = state $ \i ->
               let dims   = [ fromIntegral x :: Int64 | x <- R.shapeToList shR sh ]
-                  sh'    = TF.feed (TF.tensorValueFromName (T.pack (printf "shape_%d" i)))
+                  sh'    = TF.feed (TF.tensorValueFromName (T.pack (printf "input%d_shape" i)))
                          $ TF.encodeTensorData (TF.Shape [fromIntegral $ R.rank shR])
                          $ V.fromList dims
                   adata' = evalState (array eR adata) 0
@@ -140,7 +140,7 @@ runN acc =
                         tensorDataType       = TF.tensorType (undefined :: s)
                         tensorDataDimensions = dims
                     in
-                    (TF.feed (TF.tensorValueFromName (T.pack (printf "input_%d_%d" i j))) (TF.TensorData (Internal.TensorData {..})), j+1)
+                    (TF.feed (TF.tensorValueFromName (T.pack (printf "input%d_adata%d" i j))) (TF.TensorData (Internal.TensorData {..})), j+1)
               in
               (sh' : adata' ++ env, i+1)
 

@@ -73,7 +73,7 @@ buildOpenAfun aenv (Alam lhs f) = do
       go LeftHandSideWildcard{}               env = return env
       go (LeftHandSidePair aR bR)             env = go bR =<< go aR env
       go (LeftHandSideSingle (ArrayR shR eR)) env = state $ \i ->
-        let sh    = TF.placeholder' (TF.opName .~ TF.explicitName (T.pack (printf "shape_%d" i)))
+        let sh    = TF.placeholder' (TF.opName .~ TF.explicitName (T.pack (printf "input%d_shape" i)))
             adata = evalState (array eR) 0
 
             array :: TypeR t -> State Int (TensorArrayData t)
@@ -111,7 +111,7 @@ buildOpenAfun aenv (Alam lhs f) = do
 
             placeholder :: TF.TensorType t => State Int (TF.Tensor TF.Build t)
             placeholder = state $ \j ->
-              (TF.placeholder' (TF.opName .~ TF.explicitName (T.pack (printf "input_%d_%d" i j))), j+1)
+              (TF.placeholder' (TF.opName .~ TF.explicitName (T.pack (printf "input%d_adata%d" i j))), j+1)
         in
         (env `Apush` Tensor (ArrayR shR eR) sh adata, i+1)
 
@@ -126,7 +126,7 @@ buildOpenAfun aenv (Abody f) =
       go TupRunit              ()                                = return ()
       go (TupRpair aR bR)      (a, b)                            = (,) <$> go aR a <*> go bR b
       go (TupRsingle ArrayR{}) (Tensor (ArrayR shR eR) sh adata) = state $ \i ->
-        let sh'    = TF.identity' (TF.opName .~ TF.explicitName (T.pack (printf "output_shape_%d" i))) sh
+        let sh'    = TF.identity' (TF.opName .~ TF.explicitName (T.pack (printf "output%d_shape" i))) sh
             adata' = evalState (array eR adata) 0
 
             array :: TypeR t -> TensorArrayData t -> State Int (TensorArrayData t)
@@ -163,7 +163,7 @@ buildOpenAfun aenv (Abody f) =
             floating TypeHalf   = unsupported "half-precision floating point"
 
             label :: TF.TensorType t => TF.Tensor TF.Build t -> State Int (TF.Tensor TF.Build t)
-            label t = state $ \j -> (TF.identity' (TF.opName .~ TF.explicitName (T.pack (printf "output_%d" i))) t, j+1)
+            label t = state $ \j -> (TF.identity' (TF.opName .~ TF.explicitName (T.pack (printf "output%d_adata%d" i j))) t, j+1)
         in
         (Tensor (ArrayR shR eR) sh' adata', i+1)
 
