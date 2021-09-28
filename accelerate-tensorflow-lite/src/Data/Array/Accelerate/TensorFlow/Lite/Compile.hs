@@ -17,6 +17,7 @@ import Data.Array.Accelerate.Type
 import Data.Array.Accelerate.Representation.Array
 import Data.Array.Accelerate.Representation.Type
 
+import Data.Array.Accelerate.TensorFlow.CodeGen.AST
 import Data.Array.Accelerate.TensorFlow.CodeGen.Base
 import Data.Array.Accelerate.TensorFlow.CodeGen.Tensor
 
@@ -28,12 +29,12 @@ import qualified TensorFlow.Core                                    as TF
 
 import Control.DeepSeq
 import Control.Exception
-import Control.Monad
 import Data.Functor.Identity
 import Data.ProtoLens
 import Lens.Family2
 import System.Directory
 import System.Exit
+import System.FilePath
 import System.IO
 import System.Process
 import System.Process.Extra
@@ -42,11 +43,53 @@ import qualified Data.ByteString                                    as B
 import qualified Data.Text                                          as T
 
 
-convert_to_tflite :: TF.GraphDef -> IO FilePath
-convert_to_tflite graph = do
-  tmpDir          <- getTemporaryDirectory
-  (pb_file, pb_h) <- openBinaryTempFile tmpDir "model.pb"       -- TODO: be exception safe
-  (tf_file, tf_h) <- openBinaryTempFile tmpDir "model.tflite"   -- TODO: be exception safe
+
+compileTfun :: Tfun f -> IO FilePath
+compileTfun = compileOpenTfun
+
+compileOpenTfun :: OpenTfun aenv f -> IO FilePath
+compileOpenTfun (Tlam _ f)   = compileOpenTfun f
+compileOpenTfun (Tbody bR b) = do
+  tflite <- tflite_model (graph_of_model bR b)
+  edge   <- edgetpu_compile tflite
+  printf "compiled: %s\n" edge
+  return edge
+
+
+edgetpu_compile :: FilePath -> IO FilePath
+edgetpu_compile path = do
+  let
+      cp    = (proc "edgetpu_compiler" flags) { std_in = NoStream, std_out = NoStream, std_err = CreatePipe }
+      flags = [ "--show_operations"
+              , "--out_dir=" ++ dropFileName path
+              , path
+              ]
+      edgetpu_file = dropExtension path ++ "_edgetpu" <.> "tflite"
+
+  -- Invoke 'edgetpu_compile' to convert the tflite file into something
+  -- suitable for the edge tpu
+  withCreateProcess cp $ \Nothing Nothing (Just errh) ph -> do
+
+    -- fork off threads to start consuming stdout and stderr
+    err <- hGetContents errh
+    withForkWait (evaluate (rnf err)) $ \waitErr -> do
+      waitErr
+      hClose errh
+
+    -- wait on the process
+    ex <- waitForProcess ph
+    case ex of
+      ExitFailure r -> error $ printf "edgetpu_compiler %s (exit %d)\n%s" (unwords flags) r err
+      ExitSuccess   -> return ()
+
+  return edgetpu_file
+
+
+tflite_model :: TF.GraphDef -> IO FilePath
+tflite_model graph = do
+  tmp_dir         <- getTemporaryDirectory
+  (pb_file, pb_h) <- openBinaryTempFile tmp_dir "model.pb"      -- TODO: be exception safe
+  (tf_file, tf_h) <- openBinaryTempFile tmp_dir "model.tflite"  -- TODO: be exception safe
   --
   B.hPut pb_h (encodeMessage graph)
   hClose pb_h
@@ -56,49 +99,31 @@ convert_to_tflite graph = do
       inputs  = filter (T.isPrefixOf "input") names
       outputs = filter (T.isPrefixOf "output") names
       --
+      cp      = (proc "tflite_convert" flags) { std_in = NoStream, std_out = NoStream, std_err = CreatePipe }
       flags   = [ "--enable_v1_converter"
                 , "--graph_def_file=" ++ pb_file
                 , "--output_file=" ++ tf_file
                 , "--input_arrays=" ++ T.unpack (T.intercalate "," inputs)
                 , "--output_arrays=" ++ T.unpack (T.intercalate "," outputs)
                 ]
-      cp = (proc "tflite_convert" flags)
-            { std_in  = NoStream
-            , std_out = CreatePipe
-            , std_err = CreatePipe
-            }
 
   -- Invoke 'tflite_convert' to convert the protobuf file to the tflite representation
-  withCreateProcess cp $ \Nothing (Just outh) (Just errh) ph -> do
+  withCreateProcess cp $ \Nothing Nothing (Just errh) ph -> do
 
     -- fork off threads to start consuming stdout and stderr
-    out <- hGetContents outh
     err <- hGetContents errh
-    withForkWait (evaluate (rnf out)) $ \waitOut -> do
-      withForkWait (evaluate (rnf err)) $ \waitErr -> do
-        waitOut
-        hClose outh
-
-        waitErr
-        hClose errh
+    withForkWait (evaluate (rnf err)) $ \waitErr -> do
+      waitErr
+      hClose errh
 
     -- wait on the process
     ex <- waitForProcess ph
     case ex of
-      ExitFailure r -> error $ printf "tflite_convert %s (exit %d)\n%s\n%s" (unwords flags) r out err
+      ExitFailure r -> error $ printf "tflite_convert %s (exit %d)\n%s" (unwords flags) r err
       ExitSuccess   -> return ()
 
   removeFile pb_file
   return tf_file
-
-withBinaryTempFile :: FilePath -> String -> (FilePath -> Handle -> IO a) -> IO a
-withBinaryTempFile tmp_dir name k =
-  let finalise f h = do
-        open <- hIsOpen h
-        when open $ hClose h
-        removeFile f
-  in
-  bracket (openBinaryTempFile tmp_dir name) (uncurry finalise) (uncurry k)
 
 graph_of_model :: ArraysR arrs -> Tensors arrs -> TF.GraphDef
 graph_of_model arrR model =

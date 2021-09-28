@@ -28,6 +28,7 @@ library
   exposed-modules:
       Data.Array.Accelerate.TensorFlow.Lite
       Data.Array.Accelerate.TensorFlow.Lite.Compile
+      System.IO.Temp
       System.Process.Extra
   other-modules:
       Paths_accelerate_tensorflow_lite
@@ -41,9 +42,11 @@ library
     , bytestring
     , deepseq
     , directory
+    , filepath
     , lens-family
     , process
     , proto-lens
+    , random
     , tensorflow
     , tensorflow-proto
     , text

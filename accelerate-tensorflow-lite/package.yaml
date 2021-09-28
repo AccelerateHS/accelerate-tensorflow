@@ -26,9 +26,11 @@ dependencies:
 - bytestring
 - deepseq
 - directory
+- filepath
 - lens-family
 - process
 - proto-lens
+- random
 - tensorflow
 - tensorflow-proto
 - text
