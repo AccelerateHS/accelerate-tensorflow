@@ -162,8 +162,8 @@ signum = num
 
     integral :: IntegralType t -> TensorArrayData t -> TensorArrayData t
     integral TypeInt    = TF.sign
-    integral TypeInt8   = TF.sign
-    integral TypeInt16  = TF.sign
+    integral TypeInt8   = excluded
+    integral TypeInt16  = excluded
     integral TypeInt32  = TF.sign
     integral TypeInt64  = TF.sign
     integral TypeWord   = TF.sign
@@ -761,7 +761,7 @@ min = uncurry @t @t . single
 
     integral :: IntegralType t -> TensorArrayData t -> TensorArrayData t -> TensorArrayData t
     integral TypeInt    = TF.minimum
-    integral TypeInt8   = TF.minimum
+    integral TypeInt8   = excluded
     integral TypeInt16  = TF.minimum
     integral TypeInt32  = TF.minimum
     integral TypeInt64  = TF.minimum
@@ -788,7 +788,7 @@ max = uncurry @t @t . single
 
     integral :: IntegralType t -> TensorArrayData t -> TensorArrayData t -> TensorArrayData t
     integral TypeInt    = TF.maximum
-    integral TypeInt8   = TF.maximum
+    integral TypeInt8   = excluded
     integral TypeInt16  = TF.maximum
     integral TypeInt32  = TF.maximum
     integral TypeInt64  = TF.maximum
