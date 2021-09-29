@@ -73,7 +73,8 @@ buildOpenAfun aenv (Alam lhs f) = do
       go LeftHandSideWildcard{}               env = return env
       go (LeftHandSidePair aR bR)             env = go bR =<< go aR env
       go (LeftHandSideSingle (ArrayR shR eR)) env = state $ \i ->
-        let sh    = TF.placeholder' (TF.opName .~ TF.explicitName (T.pack (printf "input%d_shape" i)))
+        let sh    = TF.placeholder' $ (TF.opName .~ TF.explicitName (T.pack (printf "input%d_shape" i)))
+                                    . (TF.opAttr "shape" .~ TF.Shape [fromIntegral $ rank shR])
             adata = evalState (array eR) 0
 
             array :: TypeR t -> State Int (TensorArrayData t)
@@ -126,7 +127,8 @@ buildOpenAfun aenv (Abody f) =
       go TupRunit              ()                                = return ()
       go (TupRpair aR bR)      (a, b)                            = (,) <$> go aR a <*> go bR b
       go (TupRsingle ArrayR{}) (Tensor (ArrayR shR eR) sh adata) = state $ \i ->
-        let sh'    = TF.identity' (TF.opName .~ TF.explicitName (T.pack (printf "output%d_shape" i))) sh
+        let sh'    = TF.identity' ( (TF.opName .~ TF.explicitName (T.pack (printf "output%d_shape" i)))
+                                  . (TF.opAttr "shape" .~ TF.Shape [fromIntegral $ rank shR]) ) sh
             adata' = evalState (array eR adata) 0
 
             array :: TypeR t -> TensorArrayData t -> State Int (TensorArrayData t)
