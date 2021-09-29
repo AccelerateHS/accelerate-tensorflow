@@ -10,8 +10,11 @@
 -- Portability : non-portable (GHC extensions)
 --
 
-module Data.Array.Accelerate.TensorFlow.Lite.Compile
-  where
+module Data.Array.Accelerate.TensorFlow.Lite.Compile (
+
+  compileTfun,
+
+) where
 
 import Data.Array.Accelerate.Type
 import Data.Array.Accelerate.Representation.Array
@@ -55,7 +58,6 @@ compileOpenTfun (Tbody bR b) = do
   tflite <- tflite_model (graph_of_model bR b)
   edge   <- edgetpu_compile tflite
   return edge
-
 
 edgetpu_compile :: FilePath -> IO FilePath
 edgetpu_compile path = do

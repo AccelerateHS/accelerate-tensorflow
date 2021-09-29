@@ -19,6 +19,8 @@ build-type:     Simple
 extra-source-files:
     ../README.md
     ../CHANGELOG.md
+    cbits/edgetpu.cc
+    cbits/edgetpu.h
 
 source-repository head
   type: git
@@ -27,14 +29,30 @@ source-repository head
 library
   exposed-modules:
       Data.Array.Accelerate.TensorFlow.Lite
+  other-modules:
       Data.Array.Accelerate.TensorFlow.Lite.Compile
       System.IO.Temp
       System.Process.Extra
-  other-modules:
       Paths_accelerate_tensorflow_lite
   hs-source-dirs:
       src
   ghc-options: -Wall -O2
+  cc-options: -O3 -Wall -march=native
+  c-sources:
+      cbits/edgetpu.cc
+  extra-libraries:
+      stdc++
+      clog
+      cpuinfo
+      edgetpu
+      farmhash
+      fft2d_fftsg
+      fft2d_fftsg2d
+      flatbuffers
+      pthreadpool
+      ruy
+      tensorflow-lite
+      XNNPACK
   build-depends:
       accelerate ==1.3.*
     , accelerate-tensorflow
@@ -45,10 +63,12 @@ library
     , filepath
     , formatting
     , lens-family
+    , mtl
     , process
     , proto-lens
     , random
     , tensorflow
     , tensorflow-proto
     , text
+    , vector
   default-language: Haskell2010

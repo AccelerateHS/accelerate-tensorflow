@@ -19,3 +19,14 @@ Accelerate, refer to the [main repository](https://github.com/AccelerateHS/accel
 Contributions and bug reports are welcome!<br>
 Please feel free to contact me through [GitHub](https://github.com/AccelerateHS/accelerate) or [gitter.im](https://gitter.im/AccelerateHS/Lobby).
 
+## Here be dragons
+
+To build a (local) copy of tensorflow-lite:
+
+```sh
+mkdir build
+cd build
+cmake ../extra-deps/tensorflow/tensorflow/lite
+cmake --build . -j
+```
+

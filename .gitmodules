@@ -1,3 +1,6 @@
 [submodule "extra-deps/tensorflow-haskell"]
 	path = extra-deps/tensorflow-haskell
 	url = https://github.com/tensorflow/haskell.git
+[submodule "extra-deps/tensorflow"]
+	path = extra-deps/tensorflow
+	url = https://github.com/tensorflow/tensorflow.git

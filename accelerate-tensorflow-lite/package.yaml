@@ -9,6 +9,7 @@ copyright:          "2021 The Accelerate Team"
 extra-source-files:
 - ../README.md
 - ../CHANGELOG.md
+- cbits/edgetpu.*
 
 # Metadata used when publishing your package
 synopsis:           Accelerate backend component generating TensorFlow graphs
@@ -29,17 +30,43 @@ dependencies:
 - filepath
 - formatting
 - lens-family
+- mtl
 - process
 - proto-lens
 - random
 - tensorflow
 - tensorflow-proto
 - text
+- vector
 
 library:
   source-dirs: src
+  c-sources: cbits/edgetpu.cc
+
+  exposed-modules:
+    - Data.Array.Accelerate.TensorFlow.Lite
+
   ghc-options:
     - -Wall
     - -O2
+
+  cc-options:
+    -O3
+    -Wall
+    -march=native
+
+  extra-libraries:
+    - stdc++
+    - clog
+    - cpuinfo
+    - edgetpu
+    - farmhash
+    - fft2d_fftsg
+    - fft2d_fftsg2d
+    - flatbuffers
+    - pthreadpool
+    - ruy
+    - tensorflow-lite
+    - XNNPACK
 
 # vim: nospell
