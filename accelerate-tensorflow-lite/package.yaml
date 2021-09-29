@@ -27,6 +27,7 @@ dependencies:
 - deepseq
 - directory
 - filepath
+- formatting
 - lens-family
 - process
 - proto-lens

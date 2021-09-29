@@ -16,6 +16,7 @@ module Data.Array.Accelerate.TensorFlow.Lite.Compile
 import Data.Array.Accelerate.Type
 import Data.Array.Accelerate.Representation.Array
 import Data.Array.Accelerate.Representation.Type
+import qualified Data.Array.Accelerate.Debug.Internal               as Debug
 
 import Data.Array.Accelerate.TensorFlow.CodeGen.AST
 import Data.Array.Accelerate.TensorFlow.CodeGen.Base
@@ -31,6 +32,7 @@ import Control.DeepSeq
 import Control.Exception
 import Data.Functor.Identity
 import Data.ProtoLens
+import Formatting
 import Lens.Family2
 import System.Directory
 import System.Exit
@@ -52,14 +54,13 @@ compileOpenTfun (Tlam _ f)   = compileOpenTfun f
 compileOpenTfun (Tbody bR b) = do
   tflite <- tflite_model (graph_of_model bR b)
   edge   <- edgetpu_compile tflite
-  printf "compiled: %s\n" edge
   return edge
 
 
 edgetpu_compile :: FilePath -> IO FilePath
 edgetpu_compile path = do
   let
-      cp    = (proc "edgetpu_compiler" flags) { std_in = NoStream, std_out = NoStream, std_err = CreatePipe }
+      cp    = (proc "edgetpu_compiler" flags) { std_in = NoStream, std_out = CreatePipe, std_err = CreatePipe }
       flags = [ "--show_operations"
               , "--out_dir=" ++ dropFileName path
               , path
@@ -68,19 +69,26 @@ edgetpu_compile path = do
 
   -- Invoke 'edgetpu_compile' to convert the tflite file into something
   -- suitable for the edge tpu
-  withCreateProcess cp $ \Nothing Nothing (Just errh) ph -> do
+  withCreateProcess cp $ \Nothing (Just outh) (Just errh) ph -> do
 
     -- fork off threads to start consuming stdout and stderr
+    out <- hGetContents outh
     err <- hGetContents errh
-    withForkWait (evaluate (rnf err)) $ \waitErr -> do
-      waitErr
-      hClose errh
+    withForkWait (evaluate (rnf out)) $ \waitOut -> do
+      withForkWait (evaluate (rnf err)) $ \waitErr -> do
+        waitOut
+        hClose outh
+
+        waitErr
+        hClose errh
 
     -- wait on the process
     ex <- waitForProcess ph
     case ex of
       ExitFailure r -> error $ printf "edgetpu_compiler %s (exit %d)\n%s" (unwords flags) r err
       ExitSuccess   -> return ()
+
+    Debug.traceM Debug.dump_cc ("cc: edgetpu_compiler\n" % reindented 2 string) out
 
   return edgetpu_file
 
