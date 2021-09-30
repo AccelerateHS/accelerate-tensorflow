@@ -34,7 +34,7 @@ import qualified TensorFlow.Output                                  as TF
 import qualified TensorFlow.Types                                   as TF
 import qualified TensorFlow.Internal.FFI                            as TF
 
-import Control.Applicative                                          ( liftA, liftA2 )
+import Control.Applicative                                          ( liftA2 )
 import Data.Bits
 import Data.Primitive.Vec                                           ( Vec )
 import Data.Set                                                     ( Set )
@@ -56,7 +56,7 @@ data Tensor sh e where
          -> TensorArrayData e
          -> Tensor sh e
 
-type TensorShape sh    = TF.Tensor TF.Build Int64
+type TensorShape sh    = TArrayDataR (TF.Tensor TF.Build) sh
 type TensorArrayData e = TArrayDataR (TF.Tensor TF.Build) e
 
 type ScalarTensorArrayData e = TensorArrayData e ~ TF.Tensor TF.Build e
@@ -89,54 +89,66 @@ type family ScalarTensorDataR t where
   ScalarTensorDataR (Vec n t) = ScalarTensorDataR t
 
 instance TF.Nodes (Tensor sh e) where
-  getNodes (Tensor (ArrayR _ adataR) sh adata) = TF.nodesUnion [ TF.getNodes sh, go adataR adata ]
+  getNodes (Tensor (ArrayR _shR _adataR) _sh _adata) = TF.nodesUnion [ shapeNodes _shR _sh, arrayNodes _adataR _adata ]
     where
-      go :: TypeR t -> TensorArrayData t -> TF.Build (Set TF.NodeName)
-      go TupRunit ()             = return Set.empty
-      go (TupRpair aR bR) (a, b) = TF.nodesUnion [ go aR a, go bR b ]
-      go (TupRsingle aR) a       = scalar aR a
+      shapeNodes :: ShapeR sh -> TensorShape sh -> TF.Build (Set TF.NodeName)
+      shapeNodes ShapeRz          ()       = return Set.empty
+      shapeNodes (ShapeRsnoc shR) (sh, sz) = TF.nodesUnion [ shapeNodes shR sh, TF.getNodes sz ]
 
-      scalar :: ScalarType t -> TensorArrayData t -> TF.Build (Set TF.NodeName)
-      scalar (SingleScalarType t) = single t
-      scalar (VectorScalarType _) = unsupported "SIMD-vector types"
+      arrayNodes :: TypeR t -> TensorArrayData t -> TF.Build (Set TF.NodeName)
+      arrayNodes TupRunit ()             = return Set.empty
+      arrayNodes (TupRpair aR bR) (a, b) = TF.nodesUnion [ arrayNodes aR a, arrayNodes bR b ]
+      arrayNodes (TupRsingle aR) a       = scalar aR a
+        where
+          scalar :: ScalarType t -> TensorArrayData t -> TF.Build (Set TF.NodeName)
+          scalar (SingleScalarType t) = single t
+          scalar (VectorScalarType _) = unsupported "SIMD-vector types"
 
-      single :: SingleType t -> TensorArrayData t -> TF.Build (Set TF.NodeName)
-      single (NumSingleType t) = num t
+          single :: SingleType t -> TensorArrayData t -> TF.Build (Set TF.NodeName)
+          single (NumSingleType t) = num t
 
-      num :: NumType t -> TensorArrayData t -> TF.Build (Set TF.NodeName)
-      num (IntegralNumType t) = integral t
-      num (FloatingNumType t) = floating t
+          num :: NumType t -> TensorArrayData t -> TF.Build (Set TF.NodeName)
+          num (IntegralNumType t) = integral t
+          num (FloatingNumType t) = floating t
 
-      integral :: IntegralType t -> TensorArrayData t -> TF.Build (Set TF.NodeName)
-      integral TypeInt8   = TF.getNodes
-      integral TypeInt16  = TF.getNodes
-      integral TypeInt32  = TF.getNodes
-      integral TypeInt64  = TF.getNodes
-      integral TypeWord8  = TF.getNodes
-      integral TypeWord16 = TF.getNodes
-      integral TypeWord32 = TF.getNodes
-      integral TypeWord64 = TF.getNodes
-      integral TypeInt    = unsupported "Int (use at a specified bit-size instead)"
-      integral TypeWord   = unsupported "Word (use at a specified bit-size instead)"
+          integral :: IntegralType t -> TensorArrayData t -> TF.Build (Set TF.NodeName)
+          integral TypeInt8   = TF.getNodes
+          integral TypeInt16  = TF.getNodes
+          integral TypeInt32  = TF.getNodes
+          integral TypeInt64  = TF.getNodes
+          integral TypeWord8  = TF.getNodes
+          integral TypeWord16 = TF.getNodes
+          integral TypeWord32 = TF.getNodes
+          integral TypeWord64 = TF.getNodes
+          integral TypeInt    = TF.getNodes
+          integral TypeWord   = TF.getNodes
 
-      floating :: FloatingType t -> TensorArrayData t -> TF.Build (Set TF.NodeName)
-      floating TypeFloat  = TF.getNodes
-      floating TypeDouble = TF.getNodes
-      floating TypeHalf   = unsupported "half-precision floating point"
+          floating :: FloatingType t -> TensorArrayData t -> TF.Build (Set TF.NodeName)
+          floating TypeFloat  = TF.getNodes
+          floating TypeDouble = TF.getNodes
+          floating TypeHalf   = unsupported "half-precision floating point"
 
 instance TF.Fetchable (Tensor sh e) (Array sh e) where
   getFetch (Tensor (ArrayR _shR _adataR) _sh _adata) =
     liftA2 Array <$> fetchShape _shR _sh <*> fetchArray _adataR _adata
     where
       fetchShape :: ShapeR sh -> TensorShape sh -> TF.Build (TF.Fetch sh)
-      fetchShape shR sh = liftA (listToShape shR . map fromIntegral . V.toList) <$> TF.getFetch sh
+      fetchShape ShapeRz          ()       = pure (pure ())
+      fetchShape (ShapeRsnoc shR) (sh, sz) =
+        let
+            fetch :: (s ~ ScalarTensorDataR Int) => TF.Tensor TF.Build s -> TF.Build (TF.Fetch Int)
+            fetch tensor = do
+              tdata <- TF.fetchTensorVector tensor
+              return $ fromIntegral . V.head . TF.decodeTensorData <$> tdata
+        in
+        liftA2 (,) <$> fetchShape shR sh <*> fetch sz
 
       fetchArray :: TypeR t -> TensorArrayData t -> TF.Build (TF.Fetch (ArrayData t))
       fetchArray TupRunit ()             = pure (pure ())
       fetchArray (TupRpair aR bR) (a, b) = liftA2 (,) <$> fetchArray aR a <*> fetchArray bR b
       fetchArray (TupRsingle aR) a       = scalar aR a
         where
-          wrap :: (Storable t, TF.TensorType t) => TF.Tensor TF.Build t -> TF.Build (TF.Fetch (UniqueArray t))
+          wrap :: (Storable t, TF.TensorType s, ScalarTensorDataR t ~ s) => TF.Tensor TF.Build s -> TF.Build (TF.Fetch (UniqueArray t))
           wrap tensor = do
             tdata <- TF.fetchTensorVector tensor
             let vector  = TF.tensorDataBytes . TF.unTensorData <$> tdata
@@ -165,8 +177,8 @@ instance TF.Fetchable (Tensor sh e) (Array sh e) where
           integral TypeWord16 = wrap
           integral TypeWord32 = wrap
           integral TypeWord64 = wrap
-          integral TypeInt    = unsupported "Int (use at a specified bit-size instead)"
-          integral TypeWord   = unsupported "Word (use at a specified bit-size instead)"
+          integral TypeInt    = wrap
+          integral TypeWord   = wrap
 
           floating :: FloatingType t -> TensorArrayData t -> TF.Build (TF.Fetch (ArrayData t))
           floating TypeFloat  = wrap

@@ -23,24 +23,69 @@ import Data.Array.Accelerate.TensorFlow.CodeGen.Tensor
 
 import Data.Array.Accelerate.AST
 import Data.Array.Accelerate.AST.Var
+import Data.Array.Accelerate.Representation.Array
+import Data.Array.Accelerate.Representation.Shape
 import Data.Array.Accelerate.Representation.Type
 import Data.Array.Accelerate.Type
 
+import qualified TensorFlow.Core                                    as TF
 import qualified TensorFlow.Ops                                     as TF
 import qualified TensorFlow.GenOps.Core                             as TF
 
+import Prelude                                                      as P
+
 
 buildOpenExp
-    :: forall env aenv sh t.
-       TensorShape sh
+    :: forall env aenv context t.
+       ShapeR context
+    -> TensorShape context
     -> Val env
     -> Aval aenv
     -> OpenExp env aenv t
     -> TensorArrayData t
-buildOpenExp sh env aenv =
+buildOpenExp contextR context env aenv =
   let
       buildE :: OpenExp env aenv s -> TensorArrayData s
-      buildE = buildOpenExp sh env aenv
+      buildE = buildOpenExp contextR context env aenv
+
+      fillL :: TypeR s -> TensorArrayData s -> TensorArrayData s
+      fillL =
+        let sh = tensorShape contextR context
+
+            go :: TypeR s -> TensorArrayData s -> TensorArrayData s
+            go TupRunit         ()     = ()
+            go (TupRpair aR bR) (a, b) = (go aR a, go bR b)
+            go (TupRsingle aR)  a      = scalar aR a
+
+            scalar :: ScalarType s -> TensorArrayData s -> TensorArrayData s
+            scalar (SingleScalarType t) = single t
+            scalar (VectorScalarType _) = unsupported "vector types"
+
+            single :: SingleType s -> TensorArrayData s -> TensorArrayData s
+            single (NumSingleType t) = num t
+
+            num :: NumType s -> TensorArrayData s -> TensorArrayData s
+            num (IntegralNumType t) = integral t
+            num (FloatingNumType t) = floating t
+
+            integral :: IntegralType s -> TensorArrayData s -> TensorArrayData s
+            integral TypeInt8   = TF.fill sh
+            integral TypeInt16  = TF.fill sh
+            integral TypeInt32  = TF.fill sh
+            integral TypeInt64  = TF.fill sh
+            integral TypeWord8  = TF.fill sh
+            integral TypeWord16 = TF.fill sh
+            integral TypeWord32 = TF.fill sh
+            integral TypeWord64 = TF.fill sh
+            integral TypeInt    = TF.fill sh
+            integral TypeWord   = TF.fill sh
+
+            floating :: FloatingType s -> TensorArrayData s -> TensorArrayData s
+            floating TypeFloat  = TF.fill sh
+            floating TypeDouble = TF.fill sh
+            floating TypeHalf   = unsupported "half-precision floating point"
+        in
+        go
 
       condL :: OpenExp env aenv PrimBool
             -> OpenExp env aenv t
@@ -85,9 +130,15 @@ buildOpenExp sh env aenv =
             floating TypeHalf   = unsupported "half-precision floating point"
         in
         go (expType t) t' e'
+
+      shapeL :: Tensor sh e -> TensorArrayData sh
+      shapeL (Tensor (ArrayR shR' _) sh' _) = fillL (shapeType shR') sh'
+
+      shapeSizeL :: ShapeR sh -> TensorArrayData sh -> TensorArrayData Int
+      shapeSizeL = tensorShape
   in
   \case
-    Let lhs bnd body              -> buildOpenExp sh (env `push` (lhs, buildE bnd)) aenv body
+    Let lhs bnd body              -> buildOpenExp contextR context (env `push` (lhs, buildE bnd)) aenv body
     Evar (Var _ ix)               -> prj ix env
     -- Foreign tR asm f x            -> undefined
     Pair x y                      -> (buildE x, buildE y)
@@ -101,38 +152,54 @@ buildOpenExp sh env aenv =
     -- Case tag xs x                 -> undefined
     Cond p t e                    -> condL p t e
     -- While p f x                   -> undefined
-    Const t c                     -> buildConst sh t c
-    PrimConst x                   -> buildPrimConst sh x
-    PrimApp f x                   -> buildPrimFun f (buildE x)
+    Const tR c                    -> constant contextR tR context c
+    PrimConst x                   -> primConst contextR context x
+    PrimApp f x                   -> primFun f (buildE x)
     -- Index v ix                    -> undefined
     -- LinearIndex v ix              -> undefined
-    -- Shape v                       -> undefined
-    -- ShapeSize shR sh              -> undefined
+    Shape (Var _ ix)              -> shapeL (aprj ix aenv)
+    ShapeSize shR sh              -> shapeSizeL shR (buildE sh)
     -- Undef t                       -> undefined
     -- Coerce tA tB a                -> undefined
 
 
-buildPrimConst
-    :: TensorShape sh
+tensorShape
+    :: (s ~ ScalarTensorDataR Int)
+    => ShapeR sh
+    -> TensorShape sh
+    -> TF.Tensor TF.Build s
+tensorShape ShapeRz              ()       = TF.scalar 1
+tensorShape (ShapeRsnoc ShapeRz) ((), sh) = sh
+tensorShape shR                  sh       =
+  let
+      go :: (s ~ ScalarTensorDataR Int) => ShapeR sh -> TensorShape sh -> [TF.Tensor TF.Build s]
+      go ShapeRz         ()     = []
+      go (ShapeRsnoc tR) (t, h) = h : go tR t
+  in
+  TF.concat (TF.scalar 0) (go shR sh)
+
+primConst
+    :: ShapeR sh
+    -> TensorShape sh
     -> PrimConst t
     -> TensorArrayData t
-buildPrimConst sh (PrimPi t)
+primConst shR sh (PrimPi t)
   | FloatingDict <- floatingDict t
-  = buildConst sh (SingleScalarType (NumSingleType (FloatingNumType t))) pi
-buildPrimConst sh (PrimMinBound (IntegralBoundedType t))
+  = constant shR (SingleScalarType (NumSingleType (FloatingNumType t))) sh pi
+primConst shR sh (PrimMinBound (IntegralBoundedType t))
   | IntegralDict <- integralDict t
-  = buildConst sh (SingleScalarType (NumSingleType (IntegralNumType t))) minBound
-buildPrimConst sh (PrimMaxBound (IntegralBoundedType t))
+  = constant shR (SingleScalarType (NumSingleType (IntegralNumType t))) sh minBound
+primConst shR sh (PrimMaxBound (IntegralBoundedType t))
   | IntegralDict <- integralDict t
-  = buildConst sh (SingleScalarType (NumSingleType (IntegralNumType t))) maxBound
+  = constant shR (SingleScalarType (NumSingleType (IntegralNumType t))) sh maxBound
 
-
-buildConst
-    :: TensorShape sh
+constant
+    :: ShapeR sh
     -> ScalarType t
+    -> TensorShape sh
     -> t
     -> TensorArrayData t
-buildConst sh = scalar
+constant shR eR sh = scalar eR
   where
     scalar :: ScalarType t -> t -> TensorArrayData t
     scalar (SingleScalarType t) = single t
@@ -146,29 +213,28 @@ buildConst sh = scalar
     num (FloatingNumType t) = floating t
 
     integral :: IntegralType t -> t -> TensorArrayData t
-    integral TypeInt8   = TF.fill sh . TF.scalar  -- XXX: is the fill necessary? actually no...
-    integral TypeInt16  = TF.fill sh . TF.scalar
-    integral TypeInt32  = TF.fill sh . TF.scalar
-    integral TypeInt64  = TF.fill sh . TF.scalar
-    integral TypeWord8  = TF.fill sh . TF.scalar
-    integral TypeWord16 = TF.fill sh . TF.scalar
-    integral TypeWord32 = TF.fill sh . TF.scalar
-    integral TypeWord64 = TF.fill sh . TF.scalar
-    integral TypeInt    = unsupported "Int (use at a specified bit-size instead)"
-    integral TypeWord   = unsupported "Word (use at a specified bit-size instead)"
+    integral TypeInt8   = TF.fill (tensorShape shR sh) . TF.scalar
+    integral TypeInt16  = TF.fill (tensorShape shR sh) . TF.scalar
+    integral TypeInt32  = TF.fill (tensorShape shR sh) . TF.scalar
+    integral TypeInt64  = TF.fill (tensorShape shR sh) . TF.scalar
+    integral TypeWord8  = TF.fill (tensorShape shR sh) . TF.scalar
+    integral TypeWord16 = TF.fill (tensorShape shR sh) . TF.scalar
+    integral TypeWord32 = TF.fill (tensorShape shR sh) . TF.scalar
+    integral TypeWord64 = TF.fill (tensorShape shR sh) . TF.scalar
+    integral TypeInt    = TF.fill (tensorShape shR sh) . TF.scalar . P.fromIntegral
+    integral TypeWord   = TF.fill (tensorShape shR sh) . TF.scalar . P.fromIntegral
 
     floating :: FloatingType t -> t -> TensorArrayData t
-    floating TypeFloat  = TF.fill sh . TF.scalar
-    floating TypeDouble = TF.fill sh . TF.scalar
+    floating TypeFloat  = TF.fill (tensorShape shR sh) . TF.scalar
+    floating TypeDouble = TF.fill (tensorShape shR sh) . TF.scalar
     floating TypeHalf   = unsupported "half-precision floating point"
 
-
-buildPrimFun
+primFun
     :: forall a b.
        PrimFun (a -> b)
     -> TensorArrayData a
     -> TensorArrayData b
-buildPrimFun f =
+primFun f =
   case f of
     PrimAdd t               -> A.add t
     PrimSub t               -> A.sub t

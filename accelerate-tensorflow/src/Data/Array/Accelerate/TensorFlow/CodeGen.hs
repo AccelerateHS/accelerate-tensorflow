@@ -35,7 +35,7 @@ import Data.Array.Accelerate.AST.Var
 import Data.Array.Accelerate.Array.Data
 import Data.Array.Accelerate.Array.Unique
 import Data.Array.Accelerate.Lifetime
-import Data.Array.Accelerate.Representation.Array
+import Data.Array.Accelerate.Representation.Array                   hiding ( shape )
 import Data.Array.Accelerate.Representation.Shape
 import Data.Array.Accelerate.Representation.Type
 import Data.Array.Accelerate.Type
@@ -66,55 +66,60 @@ buildAfun :: Afun f -> Tfun f
 buildAfun f = evalState (buildOpenAfun Aempty f) 0
 
 buildOpenAfun :: Aval aenv -> OpenAfun aenv f -> State Int (OpenTfun aenv f)
--- buildOpenAfun aenv (Abody f)    = return (Tbody (arraysR f) (buildOpenAcc aenv f))
 buildOpenAfun aenv (Alam lhs f) = do
   let
       go :: ALeftHandSide t aenv aenv' -> Aval aenv -> State Int (Aval aenv')
-      go LeftHandSideWildcard{}               env = return env
-      go (LeftHandSidePair aR bR)             env = go bR =<< go aR env
-      go (LeftHandSideSingle (ArrayR shR eR)) env = state $ \i ->
-        let sh    = TF.placeholder' $ (TF.opName .~ TF.explicitName (T.pack (printf "input%d_shape" i)))
-                                    . (TF.opAttr "shape" .~ TF.Shape [fromIntegral $ rank shR])
-            adata = evalState (array eR) 0
+      go LeftHandSideWildcard{}                      env = return env
+      go (LeftHandSidePair aR bR)                    env = go bR =<< go aR env
+      go (LeftHandSideSingle arrR@(ArrayR _shR _eR)) env = state $ \i ->
+        let sh'    = evalState (shape _shR) 0
+            adata' = evalState (array _eR) 0
+
+            shape :: ShapeR sh -> State Int (TensorShape sh)
+            shape ShapeRz          = return ()
+            shape (ShapeRsnoc shR) = do
+              sz <- state $ \j -> (TF.placeholder' (TF.opName .~ TF.explicitName (T.pack (printf "input%d_shape%d" i j))), j+1)
+              sh <- shape shR
+              return (sh, sz)
 
             array :: TypeR t -> State Int (TensorArrayData t)
             array TupRunit         = return ()
             array (TupRpair aR bR) = (,) <$> array aR <*> array bR
             array (TupRsingle aR)  = scalar aR
+              where
+                scalar :: ScalarType t -> State Int (TensorArrayData t)
+                scalar (SingleScalarType t) = single t
+                scalar (VectorScalarType _) = unsupported "SIMD-vector types"
 
-            scalar :: ScalarType t -> State Int (TensorArrayData t)
-            scalar (SingleScalarType t) = single t
-            scalar (VectorScalarType _) = unsupported "SIMD-vector types"
+                single :: SingleType t -> State Int (TensorArrayData t)
+                single (NumSingleType t) = num t
 
-            single :: SingleType t -> State Int (TensorArrayData t)
-            single (NumSingleType t) = num t
+                num :: NumType t -> State Int (TensorArrayData t)
+                num (IntegralNumType t) = integral t
+                num (FloatingNumType t) = floating t
 
-            num :: NumType t -> State Int (TensorArrayData t)
-            num (IntegralNumType t) = integral t
-            num (FloatingNumType t) = floating t
+                integral :: IntegralType t -> State Int (TensorArrayData t)
+                integral TypeInt8   = placeholder
+                integral TypeInt16  = placeholder
+                integral TypeInt32  = placeholder
+                integral TypeInt64  = placeholder
+                integral TypeWord8  = placeholder
+                integral TypeWord16 = placeholder
+                integral TypeWord32 = placeholder
+                integral TypeWord64 = placeholder
+                integral TypeInt    = placeholder
+                integral TypeWord   = placeholder
 
-            integral :: IntegralType t -> State Int (TensorArrayData t)
-            integral TypeInt8   = placeholder
-            integral TypeInt16  = placeholder
-            integral TypeInt32  = placeholder
-            integral TypeInt64  = placeholder
-            integral TypeWord8  = placeholder
-            integral TypeWord16 = placeholder
-            integral TypeWord32 = placeholder
-            integral TypeWord64 = placeholder
-            integral TypeInt    = placeholder
-            integral TypeWord   = placeholder
+                floating :: FloatingType t -> State Int (TensorArrayData t)
+                floating TypeFloat  = placeholder
+                floating TypeDouble = placeholder
+                floating TypeHalf   = unsupported "half-precision floating point"
 
-            floating :: FloatingType t -> State Int (TensorArrayData t)
-            floating TypeFloat  = placeholder
-            floating TypeDouble = placeholder
-            floating TypeHalf   = unsupported "half-precision floating point"
-
-            placeholder :: TF.TensorType t => State Int (TF.Tensor TF.Build t)
-            placeholder = state $ \j ->
-              (TF.placeholder' (TF.opName .~ TF.explicitName (T.pack (printf "input%d_adata%d" i j))), j+1)
+                placeholder :: TF.TensorType t => State Int (TF.Tensor TF.Build t)
+                placeholder = state $ \j ->
+                  (TF.placeholder' (TF.opName .~ TF.explicitName (T.pack (printf "input%d_adata%d" i j))), j+1)
         in
-        (env `Apush` Tensor (ArrayR shR eR) sh adata, i+1)
+        (env `Apush` Tensor arrR sh' adata', i+1)
 
   --
   aenv' <- go lhs aenv
@@ -124,12 +129,19 @@ buildOpenAfun aenv (Alam lhs f) = do
 buildOpenAfun aenv (Abody f) =
   let
       go :: ArraysR t -> Tensors t -> State Int (Tensors t)
-      go TupRunit              ()                                = return ()
-      go (TupRpair aR bR)      (a, b)                            = (,) <$> go aR a <*> go bR b
-      go (TupRsingle ArrayR{}) (Tensor (ArrayR shR eR) sh adata) = state $ \i ->
-        let sh'    = TF.identity' ( (TF.opName .~ TF.explicitName (T.pack (printf "output%d_shape" i)))
-                                  . (TF.opAttr "shape" .~ TF.Shape [fromIntegral $ rank shR]) ) sh
-            adata' = evalState (array eR adata) 0
+      go TupRunit              ()                                     = return ()
+      go (TupRpair aR bR)      (a, b)                                 = (,) <$> go aR a <*> go bR b
+      go (TupRsingle ArrayR{}) (Tensor (ArrayR shR eR) _sh _adata) = state $ \i ->
+        let
+            sh'    = evalState (shape shR _sh) 0
+            adata' = evalState (array eR _adata) 0
+
+            shape :: ShapeR sh -> TensorShape sh -> State Int (TensorShape sh)
+            shape ShapeRz         ()     = return ()
+            shape (ShapeRsnoc tR) (t, h) = do
+              h' <- state $ \j -> (TF.identity' (TF.opName .~ TF.explicitName (T.pack (printf "input%d_shape%d" i j))) h, j+1)
+              t' <- shape tR t
+              return (t', h')
 
             array :: TypeR t -> TensorArrayData t -> State Int (TensorArrayData t)
             array TupRunit         ()     = return ()
@@ -196,10 +208,14 @@ buildOpenAcc aenv (OpenAcc pacc) =
            -> Tensor sh e
       useL (ArrayR shR adataR) (Array sh adata) =
         let
-            go :: TypeR t -> ArrayData t -> TensorArrayData t
-            go TupRunit ()             = ()
-            go (TupRpair aR bR) (a, b) = (go aR a, go bR b)
-            go (TupRsingle aR) a       = scalar aR a
+            shape :: ShapeR sh -> sh -> TensorShape sh
+            shape ShapeRz         ()     = ()
+            shape (ShapeRsnoc tR) (t, h) = (shape tR t, TF.scalar (fromIntegral h))
+
+            array :: TypeR t -> ArrayData t -> TensorArrayData t
+            array TupRunit ()             = ()
+            array (TupRpair aR bR) (a, b) = (array aR a, array bR b)
+            array (TupRsingle aR) a       = scalar aR a
               where
                 tensor :: forall t. (Storable t, TF.TensorType t) => UniqueArray t -> TF.Tensor TF.Build t
                 tensor ua =
@@ -242,15 +258,22 @@ buildOpenAcc aenv (OpenAcc pacc) =
                 floating TypeDouble = tensor
                 floating TypeHalf   = unsupported "half-precision floating point"
 
-            adata' = go adataR adata
-            sh'    = TF.constant (TF.Shape [fromIntegral (rank shR)]) [ fromIntegral x | x <- shapeToList shR sh ]
+            adata' = array adataR adata
+            sh'    = shape shR sh
         in
         Tensor (ArrayR shR adataR) sh' adata'
+
+      unitL :: TypeR e -> Exp aenv e -> Tensor () e
+      unitL eR e =
+        let sh' = ()
+            e'  = buildOpenExp dim0 sh' Empty aenv e
+        in
+        Tensor (ArrayR dim0 eR) sh' e'
 
       mapL :: TypeR b -> Fun aenv (a -> b) -> OpenAcc aenv (Array sh a) -> Tensor sh b
       mapL bR (Lam lhs (Body e)) xs =
         let Tensor (ArrayR shR _) sh xs' = buildA xs
-            bs                           = buildOpenExp sh (Empty `push` (lhs, xs')) aenv e
+            bs                           = buildOpenExp shR sh (Empty `push` (lhs, xs')) aenv e
         in
         Tensor (ArrayR shR bR) sh bs
       mapL _ _ _ = error "impossible"
@@ -264,10 +287,13 @@ buildOpenAcc aenv (OpenAcc pacc) =
       zipWithL cR (Lam lhsA (Lam lhsB (Body e))) xs ys =
         let Tensor (ArrayR shR _) sh xs' = buildA xs
             Tensor _              _  ys' = buildA ys
-            cs                           = buildOpenExp sh (Empty `push` (lhsA, xs') `push` (lhsB, ys')) aenv e
+            cs                           = buildOpenExp shR sh (Empty `push` (lhsA, xs') `push` (lhsB, ys')) aenv e
         in
         Tensor (ArrayR shR cR) sh cs
       zipWithL _ _ _ _ = error "impossible"
+
+      generateL :: ArrayR (Array sh e) -> Exp aenv sh -> Fun aenv (sh -> e) -> Tensor sh e
+      generateL = undefined
   in
   case pacc of
     Alet lhs bnd body                 -> aletL lhs bnd body
@@ -280,9 +306,9 @@ buildOpenAcc aenv (OpenAcc pacc) =
     -- Awhile p f xs                     -> undefined
     -- Atrace m xs ys                    -> undefined
     Use aR xs                         -> useL aR xs
-    -- Unit eR e                         -> undefined
+    Unit eR e                         -> unitL eR e
     -- Reshape shR sh a                  -> undefined
-    -- Generate aR sh f                  -> undefined
+    Generate aR sh f                  -> generateL aR sh f
     -- Transform aR sh p f xs            -> undefined
     -- Replicate slice slix sl           -> undefined
     -- Slice sliceIndex sh slix          -> undefined
