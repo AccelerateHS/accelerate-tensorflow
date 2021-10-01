@@ -53,6 +53,16 @@ To build the required TensorFlow and TensorFlow-haskell packages, you need to
 have protoc installed. If you do not have it installed, follow the directions on
 [this webpage](https://google.github.io/proto-lens/installing-protoc.html).
 
+## Installing the edgetpu library
+
+TODO: Make sure everything in this section is correct; at the moment, the list
+of what to install might be incomplete.
+TODO: non-debian Linux instructions.
+Follow the instructions from [Coral](https://coral.ai/software/#debian-packages) to get access to their debian packages through apt(-get). Then, install the following libraries:
+ - libedgetpu-dev (TODO: check necessity, probably required)
+ - edgetpu\_compiler
+ - libedgetpu1-std (recommended unless the higher frequency is required)
+
 ## Installing other dependencies
 
 Other dependencies have to be installed manually before running `stack build`.
