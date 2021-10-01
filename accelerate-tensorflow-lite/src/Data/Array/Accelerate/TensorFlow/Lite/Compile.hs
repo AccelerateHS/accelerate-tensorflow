@@ -109,8 +109,8 @@ tflite_model graph = do
       inputs  = filter (T.isPrefixOf "input") names
       outputs = filter (T.isPrefixOf "output") names
       --
-      cp      = (proc "tflite_convert" flags) { std_in = NoStream, std_out = NoStream, std_err = CreatePipe }
-      flags   = [ "--enable_v1_converter"
+      cp      = (proc "python3" flags) { std_in = NoStream, std_out = NoStream, std_err = CreatePipe }
+      flags   = [ "converter.py"
                 , "--graph_def_file=" ++ pb_file
                 , "--output_file=" ++ tf_file
                 , "--input_arrays=" ++ T.unpack (T.intercalate "," inputs)
@@ -129,7 +129,7 @@ tflite_model graph = do
     -- wait on the process
     ex <- waitForProcess ph
     case ex of
-      ExitFailure r -> error $ printf "tflite_convert %s (exit %d)\n%s" (unwords flags) r err
+      ExitFailure r -> error $ printf "python3 %s (exit %d)\n%s" (unwords flags) r err
       ExitSuccess   -> return ()
 
   removeFile pb_file
