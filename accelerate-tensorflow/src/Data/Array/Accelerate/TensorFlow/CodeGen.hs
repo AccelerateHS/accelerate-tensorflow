@@ -317,8 +317,8 @@ buildOpenAcc aenv (OpenAcc pacc) =
             shR                         = sliceDomainR slice
             sh'                         = extend slice slix' sl'
 
-            sh_                         = tensorShape shR sh'
-            sl_                         = tensorShape shR (pad slice sl')
+            sh_                         = shapeToTensor shR sh'
+            sl_                         = shapeToTensor shR (pad slice sl')
 
             extend :: SliceIndex slix sl co sh -> TensorShape slix -> TensorShape sl -> TensorShape sh
             extend SliceNil              ()        ()       = ()
