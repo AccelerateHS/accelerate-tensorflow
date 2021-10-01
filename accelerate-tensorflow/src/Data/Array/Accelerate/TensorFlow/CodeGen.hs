@@ -37,6 +37,7 @@ import Data.Array.Accelerate.Array.Unique
 import Data.Array.Accelerate.Lifetime
 import Data.Array.Accelerate.Representation.Array                   hiding ( shape )
 import Data.Array.Accelerate.Representation.Shape
+import Data.Array.Accelerate.Representation.Slice
 import Data.Array.Accelerate.Representation.Type
 import Data.Array.Accelerate.Type
 
@@ -217,14 +218,16 @@ buildOpenAcc aenv (OpenAcc pacc) =
             array (TupRpair aR bR) (a, b) = (array aR a, array bR b)
             array (TupRsingle aR) a       = scalar aR a
               where
-                tensor :: forall t. (Storable t, TF.TensorType t) => UniqueArray t -> TF.Tensor TF.Build t
+                tensor :: forall s t. (Storable t, s ~ ScalarTensorDataR t, TF.TensorType s)
+                       => UniqueArray t
+                       -> TF.Tensor TF.Build s
                 tensor ua =
                   let fp     = unsafeGetValue (uniqueArrayData ua)
                       values = B.fromForeignPtr (castForeignPtr fp) 0 (size shR sh * sizeOf (undefined :: t))
 
                       node :: TF.TensorProto
                       node = def
-                           & TF.dtype .~ TF.tensorType (undefined :: t)
+                           & TF.dtype .~ TF.tensorType (undefined :: s)
                            & TF.tensorShape.TensorShape.dim .~ [ def & TensorShape.size .~ fromIntegral x | x <- shapeToList shR sh ]
                            & TF.tensorContent .~ values
                   in
@@ -250,8 +253,8 @@ buildOpenAcc aenv (OpenAcc pacc) =
                 integral TypeWord16 = tensor
                 integral TypeWord32 = tensor
                 integral TypeWord64 = tensor
-                integral TypeInt    = unsupported "Int (use at a specified bit-size instead)"
-                integral TypeWord   = unsupported "Word (use at a specified bit-size instead)"
+                integral TypeInt    = tensor
+                integral TypeWord   = tensor
 
                 floating :: FloatingType t -> ArrayData t -> TensorArrayData t
                 floating TypeFloat  = tensor
@@ -292,8 +295,77 @@ buildOpenAcc aenv (OpenAcc pacc) =
         Tensor (ArrayR shR cR) sh cs
       zipWithL _ _ _ _ = error "impossible"
 
+      fillL :: ArrayR (Array sh e) -> Exp aenv sh -> Exp aenv e -> Tensor sh e
+      fillL (ArrayR shR eR) sh e =
+        let sh' = buildOpenExp shR (singleton shR) Empty aenv sh
+            e'  = buildOpenExp shR sh'             Empty aenv e
+        in
+        Tensor (ArrayR shR eR) sh' e'
+
       generateL :: ArrayR (Array sh e) -> Exp aenv sh -> Fun aenv (sh -> e) -> Tensor sh e
       generateL = undefined
+
+      replicateL
+          :: SliceIndex slix sl co sh
+          -> Exp aenv slix
+          -> OpenAcc aenv (Array sl e)
+          -> Tensor sh e
+      replicateL slice slix acc =
+        let
+            Tensor (ArrayR _ eR) sl' e' = buildA acc
+            slix'                       = buildOpenExp dim0 () Empty aenv slix
+            shR                         = sliceDomainR slice
+            sh'                         = extend slice slix' sl'
+
+            sh_                         = tensorShape shR sh'
+            sl_                         = tensorShape shR (pad slice sl')
+
+            extend :: SliceIndex slix sl co sh -> TensorShape slix -> TensorShape sl -> TensorShape sh
+            extend SliceNil              ()        ()       = ()
+            extend (SliceAll sliceIdx)   (slx, ()) (sl, sz) = (extend sliceIdx slx sl, sz)
+            extend (SliceFixed sliceIdx) (slx, sz) sl       = (extend sliceIdx slx sl, sz)
+
+            pad :: SliceIndex slix sl co sh -> TensorShape sl -> TensorShape sh
+            pad SliceNil              ()       = ()
+            pad (SliceAll sliceIdx)   (sl, sz) = (pad sliceIdx sl, sz)
+            pad (SliceFixed sliceIdx) sl       = (pad sliceIdx sl, TF.scalar 1)
+
+            go :: TypeR s -> TensorArrayData s -> TensorArrayData s
+            go TupRunit         ()     = ()
+            go (TupRpair aR bR) (a, b) = (go aR a, go bR b)
+            go (TupRsingle aR)  a      =
+              let
+                  scalar :: ScalarType s -> TensorArrayData s -> TensorArrayData s
+                  scalar (SingleScalarType t) = single t
+                  scalar (VectorScalarType _) = unsupported "vector types"
+
+                  single :: SingleType s -> TensorArrayData s -> TensorArrayData s
+                  single (NumSingleType t) = num t
+
+                  num :: NumType s -> TensorArrayData s -> TensorArrayData s
+                  num (IntegralNumType t) = integral t
+                  num (FloatingNumType t) = floating t
+
+                  integral :: IntegralType s -> TensorArrayData s -> TensorArrayData s
+                  integral TypeInt8   s = TF.tile (TF.reshape s sl_) sh_
+                  integral TypeInt16  s = TF.tile (TF.reshape s sl_) sh_
+                  integral TypeInt32  s = TF.tile (TF.reshape s sl_) sh_
+                  integral TypeInt64  s = TF.tile (TF.reshape s sl_) sh_
+                  integral TypeWord8  s = TF.tile (TF.reshape s sl_) sh_
+                  integral TypeWord16 s = TF.tile (TF.reshape s sl_) sh_
+                  integral TypeWord32 s = TF.tile (TF.reshape s sl_) sh_
+                  integral TypeWord64 s = TF.tile (TF.reshape s sl_) sh_
+                  integral TypeInt    s = TF.tile (TF.reshape s sl_) sh_
+                  integral TypeWord   s = TF.tile (TF.reshape s sl_) sh_
+
+                  floating :: FloatingType s -> TensorArrayData s -> TensorArrayData s
+                  floating TypeFloat  s = TF.tile (TF.reshape s sl_) sh_
+                  floating TypeDouble s = TF.tile (TF.reshape s sl_) sh_
+                  floating TypeHalf   _ = unsupported "half-precision floating point"
+              in
+              scalar aR a
+        in
+        Tensor (ArrayR shR eR) sh' (go eR e')
   in
   case pacc of
     Alet lhs bnd body                 -> aletL lhs bnd body
@@ -310,7 +382,7 @@ buildOpenAcc aenv (OpenAcc pacc) =
     -- Reshape shR sh a                  -> undefined
     Generate aR sh f                  -> generateL aR sh f
     -- Transform aR sh p f xs            -> undefined
-    -- Replicate slice slix sl           -> undefined
+    Replicate slice slix sl           -> replicateL slice slix sl
     -- Slice sliceIndex sh slix          -> undefined
     Map bR f xs                       -> mapL bR f xs
     ZipWith cR f xs ys                -> zipWithL cR f xs ys
@@ -322,4 +394,8 @@ buildOpenAcc aenv (OpenAcc pacc) =
     -- Backpermute shR sh p xs           -> undefined
     -- Stencil sR tR f b xs              -> undefined
     -- Stencil2 sR1 sR2 tR f b1 xs b2 ys -> undefined
+
+singleton :: ShapeR sh -> TensorShape sh
+singleton ShapeRz          = ()
+singleton (ShapeRsnoc shR) = (singleton shR, TF.scalar 1)
 

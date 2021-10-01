@@ -174,7 +174,7 @@ tensorShape shR                  sh       =
   let
       go :: (s ~ ScalarTensorDataR Int) => ShapeR sh -> TensorShape sh -> [TF.Tensor TF.Build s]
       go ShapeRz         ()     = []
-      go (ShapeRsnoc tR) (t, h) = h : go tR t
+      go (ShapeRsnoc tR) (t, h) = go tR t ++ [TF.reshape h (TF.scalar (1 :: Int32))]
   in
   TF.concat (TF.scalar 0) (go shR sh)
 
