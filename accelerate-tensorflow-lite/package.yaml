@@ -10,6 +10,7 @@ extra-source-files:
 - ../README.md
 - ../CHANGELOG.md
 - cbits/edgetpu.*
+- converter.py
 
 # Metadata used when publishing your package
 synopsis:           Accelerate backend component generating TensorFlow graphs
@@ -41,7 +42,7 @@ dependencies:
 
 library:
   source-dirs: src
-  c-sources: cbits/edgetpu.cc
+  cxx-sources: cbits/edgetpu.cc
 
   exposed-modules:
     - Data.Array.Accelerate.TensorFlow.Lite
@@ -56,17 +57,17 @@ library:
     -march=native
 
   extra-libraries:
-    - stdc++
-    - clog
-    - cpuinfo
-    - edgetpu
-    - farmhash
-    - fft2d_fftsg
-    - fft2d_fftsg2d
-    - flatbuffers
-    - pthreadpool
-    - ruy
-    - tensorflow-lite
-    - XNNPACK
+      stdc++
+      clog
+      cpuinfo
+      edgetpu
+      farmhash
+      tensorflow-lite
+      ruy
+      XNNPACK
+      flatbuffers
+      pthreadpool
+      fft2d_fftsg
+      fft2d_fftsg2d
 
 # vim: nospell
