@@ -39,13 +39,17 @@ def parse_args(args):
             outfile = arg[14:]
             pass
         elif arg.startswith('--input_arrays='):
-            in_arrs = arg[15:]
+            in_arrs = parse_array_arg(arg[15:])
             pass
         elif arg.startswith('--output_arrays='):
-            out_arrs = arg[16:]
+            out_arrs = parse_array_arg(arg[16:])
             pass
 
     return (graph_def, outfile, in_arrs, out_arrs)
+
+
+def parse_array_arg(arg):
+    return arg.split(",")
 
 
 def main():
@@ -56,8 +60,8 @@ def main():
     # TODO: use the inputs and outputs values
     converter = tf.compat.v1.lite.TFLiteConverter.from_frozen_graph(
         graph_def_file=in_file
-      , input_arrays=['input0_adata0', 'input1_adata0']
-      , output_arrays=['output0_adata0']
+      , input_arrays=inputs
+      , output_arrays=outputs
       )
 
     converter.optimizations = [tf.lite.Optimize.DEFAULT]
