@@ -115,6 +115,8 @@ tflite_model graph = do
                 , "--output_file=" ++ tf_file
                 , "--input_arrays=" ++ T.unpack (T.intercalate "," inputs)
                 , "--output_arrays=" ++ T.unpack (T.intercalate "," outputs)
+                  -- TODO: Make this file be a variable of some sorts
+                , "--data_path=" ++ "repr_data.bin"
                 ]
 
   -- Invoke 'tflite_convert' to convert the protobuf file to the tflite representation
