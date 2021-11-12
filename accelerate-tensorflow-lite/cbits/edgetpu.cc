@@ -45,8 +45,9 @@ extern "C" void edgetpu_run(const char* model_path, const char** tensor_name, ui
     auto input_name = interpreter->GetInputName(i);
 
     for (size_t j = 0; j < tensor_count; ++j) {
-      if (0 == strcmp(input_name, tensor_name[i])) {
-        memcpy(interpreter->typed_input_tensor<uint8_t*>(j), tensor_data[j], tensor_size_bytes[j]);
+      if (0 == strcmp(input_name, tensor_name[j])) {
+        auto tensor = interpreter->typed_input_tensor<float>(i);
+        memcpy(tensor, tensor_data[j], tensor_size_bytes[j]);
         break;
       }
     }
@@ -61,10 +62,10 @@ extern "C" void edgetpu_run(const char* model_path, const char** tensor_name, ui
     auto output_name = interpreter->GetOutputName(i);
 
     for (size_t j = 0; j < tensor_count; ++j) {
-      if (0 == strcmp(output_name, tensor_name[i])) {
+      if (0 == strcmp(output_name, tensor_name[j])) {
         // TODO: Assumes that the size of the output tensor data is known
         // statically, but we should really get it from the output?_shape
-        memcpy(tensor_data[j], interpreter->typed_output_tensor<uint8_t*>(i), tensor_size_bytes[j]);
+        memcpy(tensor_data[j], interpreter->typed_output_tensor<float>(i), tensor_size_bytes[j]);
         break;
       }
     }
