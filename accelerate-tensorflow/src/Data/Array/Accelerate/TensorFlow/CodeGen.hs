@@ -118,7 +118,9 @@ buildOpenAfun aenv (Alam lhs f) = do
 
                 placeholder :: TF.TensorType t => State Int (TF.Tensor TF.Build t)
                 placeholder = state $ \j ->
-                  (TF.placeholder' (TF.opName .~ TF.explicitName (T.pack (printf "input%d_adata%d" i j))), j+1)
+                  let opName = TF.opName .~ TF.explicitName (T.pack (printf "input%d_adata%d" i j))
+                      setShape = TF.opAttr "shape" .~ TF.Shape [5] -- TODO: Find correct shape
+                  in  (TF.placeholder' (setShape . opName), j+1)
         in
         (env `Apush` Tensor arrR sh' adata', i+1)
 
