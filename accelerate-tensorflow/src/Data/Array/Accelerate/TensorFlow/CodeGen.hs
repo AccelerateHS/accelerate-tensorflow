@@ -303,7 +303,9 @@ buildOpenAcc aenv (OpenAcc pacc) =
         Tensor (ArrayR shR eR) sh' e'
 
       generateL :: ArrayR (Array sh e) -> Exp aenv sh -> Fun aenv (sh -> e) -> Tensor sh e
-      generateL = undefined
+      generateL aR sh f
+        | Lam LeftHandSideWildcard{} (Body e) <- f = fillL aR sh e
+        | otherwise                                = error "unsupported operation: generate"
 
       replicateL
           :: SliceIndex slix sl co sh
