@@ -333,10 +333,10 @@ buildOpenAcc aenv (OpenAcc pacc) =
             pad (SliceAll sliceIdx)   (sl, sz) = (pad sliceIdx sl, sz)
             pad (SliceFixed sliceIdx) sl       = (pad sliceIdx sl, TF.scalar 1)
 
-            go :: TypeR s -> TensorArrayData s -> TensorArrayData s
-            go TupRunit         ()     = ()
-            go (TupRpair aR bR) (a, b) = (go aR a, go bR b)
-            go (TupRsingle aR)  a      =
+            array :: TypeR s -> TensorArrayData s -> TensorArrayData s
+            array TupRunit         ()     = ()
+            array (TupRpair aR bR) (a, b) = (array aR a, array bR b)
+            array (TupRsingle aR)  a      =
               let
                   scalar :: ScalarType s -> TensorArrayData s -> TensorArrayData s
                   scalar (SingleScalarType t) = single t
@@ -368,7 +368,7 @@ buildOpenAcc aenv (OpenAcc pacc) =
               in
               scalar aR a
         in
-        Tensor (ArrayR shR eR) sh' (go eR e')
+        Tensor (ArrayR shR eR) sh' (array eR e')
 
       foldL :: Fun aenv (e -> e -> e)
             -> Maybe (Exp aenv e)
@@ -392,43 +392,108 @@ buildOpenAcc aenv (OpenAcc pacc) =
 
       sumL :: OpenAcc aenv (Array (sh, Int) e)
            -> Tensor sh e
-      sumL xs =
-        let Tensor (ArrayR (ShapeRsnoc shR') eR) (sh', _) xs' = buildA xs
+      sumL acc =
+        let Tensor (ArrayR (ShapeRsnoc shR') eR) (sh', _) xs' = buildA acc
 
             array :: TypeR t -> TensorArrayData t -> TensorArrayData t
             array TupRunit        () = ()
             array TupRpair{}      _  = unsupported "sum: product types"
-            array (TupRsingle aR) a  = scalar aR a
+            array (TupRsingle aR) a  =
+              let
+                  scalar :: ScalarType t -> TensorArrayData t -> TensorArrayData t
+                  scalar (SingleScalarType t) = single t
+                  scalar (VectorScalarType _) = unsupported "SIMD-vector types"
 
-            scalar :: ScalarType t -> TensorArrayData t -> TensorArrayData t
-            scalar (SingleScalarType t) = single t
-            scalar (VectorScalarType _) = unsupported "SIMD-vector types"
+                  single :: SingleType t -> TensorArrayData t -> TensorArrayData t
+                  single (NumSingleType t) = num t
 
-            single :: SingleType t -> TensorArrayData t -> TensorArrayData t
-            single (NumSingleType t) = num t
+                  num :: NumType t -> TensorArrayData t -> TensorArrayData t
+                  num (IntegralNumType t) = integral t
+                  num (FloatingNumType t) = floating t
 
-            num :: NumType t -> TensorArrayData t -> TensorArrayData t
-            num (IntegralNumType t) = integral t
-            num (FloatingNumType t) = floating t
+                  integral :: IntegralType t -> TensorArrayData t -> TensorArrayData t
+                  integral TypeInt8   x = TF.sum x (TF.scalar @Int32 (fromIntegral (rank shR')))
+                  integral TypeInt16  x = TF.sum x (TF.scalar @Int32 (fromIntegral (rank shR')))
+                  integral TypeInt32  x = TF.sum x (TF.scalar @Int32 (fromIntegral (rank shR')))
+                  integral TypeInt64  x = TF.sum x (TF.scalar @Int32 (fromIntegral (rank shR')))
+                  integral TypeWord8  x = TF.sum x (TF.scalar @Int32 (fromIntegral (rank shR')))
+                  integral TypeWord16 x = TF.sum x (TF.scalar @Int32 (fromIntegral (rank shR')))
+                  integral TypeWord32 x = TF.sum x (TF.scalar @Int32 (fromIntegral (rank shR')))
+                  integral TypeWord64 x = TF.sum x (TF.scalar @Int32 (fromIntegral (rank shR')))
+                  integral TypeInt    x = TF.sum x (TF.scalar @Int32 (fromIntegral (rank shR')))
+                  integral TypeWord   x = TF.sum x (TF.scalar @Int32 (fromIntegral (rank shR')))
 
-            integral :: IntegralType t -> TensorArrayData t -> TensorArrayData t
-            integral TypeInt8   a = TF.sum a (TF.scalar @Int32 (fromIntegral (rank shR')))
-            integral TypeInt16  a = TF.sum a (TF.scalar @Int32 (fromIntegral (rank shR')))
-            integral TypeInt32  a = TF.sum a (TF.scalar @Int32 (fromIntegral (rank shR')))
-            integral TypeInt64  a = TF.sum a (TF.scalar @Int32 (fromIntegral (rank shR')))
-            integral TypeWord8  a = TF.sum a (TF.scalar @Int32 (fromIntegral (rank shR')))
-            integral TypeWord16 a = TF.sum a (TF.scalar @Int32 (fromIntegral (rank shR')))
-            integral TypeWord32 a = TF.sum a (TF.scalar @Int32 (fromIntegral (rank shR')))
-            integral TypeWord64 a = TF.sum a (TF.scalar @Int32 (fromIntegral (rank shR')))
-            integral TypeInt    a = TF.sum a (TF.scalar @Int32 (fromIntegral (rank shR')))
-            integral TypeWord   a = TF.sum a (TF.scalar @Int32 (fromIntegral (rank shR')))
-
-            floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t
-            floating TypeFloat  a = TF.sum a (TF.scalar @Int32 (fromIntegral (rank shR')))
-            floating TypeDouble a = TF.sum a (TF.scalar @Int32 (fromIntegral (rank shR')))
-            floating TypeHalf   _ = unsupported "half-precision floating point"
+                  floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t
+                  floating TypeFloat  x = TF.sum x (TF.scalar @Int32 (fromIntegral (rank shR')))
+                  floating TypeDouble x = TF.sum x (TF.scalar @Int32 (fromIntegral (rank shR')))
+                  floating TypeHalf   _ = unsupported "half-precision floating point"
+              in
+              scalar aR a
         in
         Tensor (ArrayR shR' eR) sh' (array eR xs')
+
+      backpermuteL
+          :: ShapeR sh'
+          -> Exp aenv sh'
+          -> Fun aenv (sh' -> sh)
+          -> OpenAcc aenv (Array sh e)
+          -> Tensor sh' e
+      backpermuteL shR' _sh' p acc
+        | ArrayR shR _                    <- arrayR acc
+        , ShapeRsnoc (ShapeRsnoc ShapeRz) <- shR
+        , ShapeRsnoc (ShapeRsnoc ShapeRz) <- shR'
+        , Lam _ (Body b)                  <- p
+        , Pair (Pair Nil x) y             <- b
+        , Evar (Var _ ZeroIdx)            <- x
+        , Evar (Var _ (SuccIdx ZeroIdx))  <- y
+        -- TODO: check the result shape?
+        = transposeL acc
+
+        | otherwise
+        = unsupported "backpermute"
+
+      transposeL
+          :: OpenAcc aenv (Array DIM2 e)
+          -> Tensor DIM2 e
+      transposeL acc =
+        let Tensor (ArrayR shR eR) (((), h),w) xs = buildA acc
+
+            array :: TypeR t -> TensorArrayData t -> TensorArrayData t
+            array TupRunit         ()     = ()
+            array (TupRpair aR bR) (a, b) = (array aR a, array bR b)
+            array (TupRsingle aR)  a      =
+              let
+                  scalar :: ScalarType t -> TensorArrayData t -> TensorArrayData t
+                  scalar (SingleScalarType t) = single t
+                  scalar (VectorScalarType _) = unsupported "SIMD-vector types"
+
+                  single :: SingleType t -> TensorArrayData t -> TensorArrayData t
+                  single (NumSingleType t) = num t
+
+                  num :: NumType t -> TensorArrayData t -> TensorArrayData t
+                  num (IntegralNumType t) = integral t
+                  num (FloatingNumType t) = floating t
+
+                  integral :: IntegralType t -> TensorArrayData t -> TensorArrayData t
+                  integral TypeInt8   x = TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])
+                  integral TypeInt16  x = TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])
+                  integral TypeInt32  x = TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])
+                  integral TypeInt64  x = TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])
+                  integral TypeWord8  x = TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])
+                  integral TypeWord16 x = TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])
+                  integral TypeWord32 x = TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])
+                  integral TypeWord64 x = TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])
+                  integral TypeInt    x = TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])
+                  integral TypeWord   x = TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])
+
+                  floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t
+                  floating TypeFloat  x = TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])
+                  floating TypeDouble x = TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])
+                  floating TypeHalf   _ = unsupported "half-precision floating point"
+              in
+              scalar aR a
+        in
+        Tensor (ArrayR shR eR) (((), w), h) (array eR xs)
   in
   case pacc of
     Alet lhs bnd body                 -> aletL lhs bnd body
@@ -454,7 +519,7 @@ buildOpenAcc aenv (OpenAcc pacc) =
     -- Scan dir f z xs                   -> undefined
     -- Scan' dir f z xs                  -> undefined
     -- Permute f d p xs                  -> undefined
-    -- Backpermute shR sh p xs           -> undefined
+    Backpermute shR sh p xs           -> backpermuteL shR sh p xs
     -- Stencil sR tR f b xs              -> undefined
     -- Stencil2 sR1 sR2 tR f b1 xs b2 ys -> undefined
 
