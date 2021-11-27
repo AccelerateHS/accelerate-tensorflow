@@ -32,6 +32,7 @@ import Data.Array.Accelerate.TensorFlow.CodeGen.Tensor
 import Data.Array.Accelerate.AST
 import Data.Array.Accelerate.AST.LeftHandSide
 import Data.Array.Accelerate.AST.Var
+import Data.Array.Accelerate.AST.Idx
 import Data.Array.Accelerate.Array.Data
 import Data.Array.Accelerate.Array.Unique
 import Data.Array.Accelerate.Lifetime
@@ -305,7 +306,7 @@ buildOpenAcc aenv (OpenAcc pacc) =
       generateL :: ArrayR (Array sh e) -> Exp aenv sh -> Fun aenv (sh -> e) -> Tensor sh e
       generateL aR sh f
         | Lam LeftHandSideWildcard{} (Body e) <- f = fillL aR sh e
-        | otherwise                                = error "unsupported operation: generate"
+        | otherwise                                = unsupported "generate"
 
       replicateL
           :: SliceIndex slix sl co sh
@@ -368,6 +369,66 @@ buildOpenAcc aenv (OpenAcc pacc) =
               scalar aR a
         in
         Tensor (ArrayR shR eR) sh' (go eR e')
+
+      foldL :: Fun aenv (e -> e -> e)
+            -> Maybe (Exp aenv e)
+            -> OpenAcc aenv (Array (sh, Int) e)
+            -> Tensor sh e
+      foldL f z xs
+        | Lam LeftHandSideSingle{} (Lam LeftHandSideSingle{} (Body b)) <- f
+        , PrimApp (PrimAdd _) (Pair x y)                               <- b
+        , Evar (Var _ (SuccIdx ZeroIdx))                               <- x
+        , Evar (Var _ ZeroIdx)                                         <- y
+        , True <- case z of
+            Nothing -> True
+            Just (Const (SingleScalarType (NumSingleType n)) v)
+              | IntegralNumType t <- n, IntegralDict <- integralDict t -> v == 0
+              | FloatingNumType t <- n, FloatingDict <- floatingDict t -> v == 0
+            _ -> False
+        = sumL xs
+
+        | otherwise
+        = unsupported "fold"
+
+      sumL :: OpenAcc aenv (Array (sh, Int) e)
+           -> Tensor sh e
+      sumL xs =
+        let Tensor (ArrayR (ShapeRsnoc shR') eR) (sh', _) xs' = buildA xs
+
+            array :: TypeR t -> TensorArrayData t -> TensorArrayData t
+            array TupRunit        () = ()
+            array TupRpair{}      _  = unsupported "sum: product types"
+            array (TupRsingle aR) a  = scalar aR a
+
+            scalar :: ScalarType t -> TensorArrayData t -> TensorArrayData t
+            scalar (SingleScalarType t) = single t
+            scalar (VectorScalarType _) = unsupported "SIMD-vector types"
+
+            single :: SingleType t -> TensorArrayData t -> TensorArrayData t
+            single (NumSingleType t) = num t
+
+            num :: NumType t -> TensorArrayData t -> TensorArrayData t
+            num (IntegralNumType t) = integral t
+            num (FloatingNumType t) = floating t
+
+            integral :: IntegralType t -> TensorArrayData t -> TensorArrayData t
+            integral TypeInt8   a = TF.sum a (TF.scalar @Int32 (fromIntegral (rank shR')))
+            integral TypeInt16  a = TF.sum a (TF.scalar @Int32 (fromIntegral (rank shR')))
+            integral TypeInt32  a = TF.sum a (TF.scalar @Int32 (fromIntegral (rank shR')))
+            integral TypeInt64  a = TF.sum a (TF.scalar @Int32 (fromIntegral (rank shR')))
+            integral TypeWord8  a = TF.sum a (TF.scalar @Int32 (fromIntegral (rank shR')))
+            integral TypeWord16 a = TF.sum a (TF.scalar @Int32 (fromIntegral (rank shR')))
+            integral TypeWord32 a = TF.sum a (TF.scalar @Int32 (fromIntegral (rank shR')))
+            integral TypeWord64 a = TF.sum a (TF.scalar @Int32 (fromIntegral (rank shR')))
+            integral TypeInt    a = TF.sum a (TF.scalar @Int32 (fromIntegral (rank shR')))
+            integral TypeWord   a = TF.sum a (TF.scalar @Int32 (fromIntegral (rank shR')))
+
+            floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t
+            floating TypeFloat  a = TF.sum a (TF.scalar @Int32 (fromIntegral (rank shR')))
+            floating TypeDouble a = TF.sum a (TF.scalar @Int32 (fromIntegral (rank shR')))
+            floating TypeHalf   _ = unsupported "half-precision floating point"
+        in
+        Tensor (ArrayR shR' eR) sh' (array eR xs')
   in
   case pacc of
     Alet lhs bnd body                 -> aletL lhs bnd body
@@ -388,7 +449,7 @@ buildOpenAcc aenv (OpenAcc pacc) =
     -- Slice sliceIndex sh slix          -> undefined
     Map bR f xs                       -> mapL bR f xs
     ZipWith cR f xs ys                -> zipWithL cR f xs ys
-    -- Fold f z xs                       -> undefined
+    Fold f z xs                       -> foldL f z xs
     -- FoldSeg iR f z xs ss              -> undefined
     -- Scan dir f z xs                   -> undefined
     -- Scan' dir f z xs                  -> undefined
