@@ -27,12 +27,14 @@ import Data.Array.Accelerate.TensorFlow.CodeGen.AST
 import Data.Array.Accelerate.TensorFlow.CodeGen.Base
 import Data.Array.Accelerate.TensorFlow.CodeGen.Environment
 import Data.Array.Accelerate.TensorFlow.CodeGen.Exp
+import Data.Array.Accelerate.TensorFlow.CodeGen.Foreign
 import Data.Array.Accelerate.TensorFlow.CodeGen.Tensor
 
 import Data.Array.Accelerate.AST
+import Data.Array.Accelerate.AST.Environment                        ( weakenEmpty )
+import Data.Array.Accelerate.AST.Idx
 import Data.Array.Accelerate.AST.LeftHandSide
 import Data.Array.Accelerate.AST.Var
-import Data.Array.Accelerate.AST.Idx
 import Data.Array.Accelerate.Array.Data
 import Data.Array.Accelerate.Array.Unique
 import Data.Array.Accelerate.Lifetime
@@ -40,6 +42,8 @@ import Data.Array.Accelerate.Representation.Array                   hiding ( sha
 import Data.Array.Accelerate.Representation.Shape
 import Data.Array.Accelerate.Representation.Slice
 import Data.Array.Accelerate.Representation.Type
+import Data.Array.Accelerate.Sugar.Foreign
+import Data.Array.Accelerate.Trafo.Substitution
 import Data.Array.Accelerate.Type
 
 import Data.ProtoLens.Default                                       ( def )
@@ -55,6 +59,7 @@ import qualified TensorFlow.Types                                   as TF
 
 import Control.Monad.State
 import Data.ByteString.Internal                                     as B
+import Data.Typeable
 import Foreign.ForeignPtr
 import Foreign.Storable
 import Text.Printf
@@ -122,7 +127,6 @@ buildOpenAfun aenv (Alam lhs f) = do
                   (TF.placeholder' (TF.opName .~ TF.explicitName (T.pack (printf "input%d_adata%d" i j))), j+1)
         in
         (env `Apush` Tensor arrR sh' adata', i+1)
-
   --
   aenv' <- go lhs aenv
   f'    <- buildOpenAfun aenv' f
@@ -494,6 +498,21 @@ buildOpenAcc aenv (OpenAcc pacc) =
               scalar aR a
         in
         Tensor (ArrayR shR eR) (((), w), h) (array eR xs)
+
+      aforeignL
+          :: forall asm a b. Foreign asm
+          => ArraysR b
+          -> asm (a -> b)
+          -> Afun (a -> b)
+          -> OpenAcc aenv a
+          -> Tensors b
+      aforeignL bR asm g a
+        | Just Refl      <- eqT @asm @ForeignAcc
+        , ForeignAcc _ f <- asm
+        = f (buildOpenAcc aenv a)
+
+        | otherwise
+        = buildOpenAcc aenv (OpenAcc $ Apply bR (weaken weakenEmpty g) a)
   in
   case pacc of
     Alet lhs bnd body                 -> aletL lhs bnd body
@@ -501,7 +520,7 @@ buildOpenAcc aenv (OpenAcc pacc) =
     Apair xs ys                       -> (buildOpenAcc aenv xs, buildOpenAcc aenv ys)
     Anil                              -> ()
     -- Apply aR f xs                     -> undefined
-    -- Aforeign aR asm f xs              -> undefined
+    Aforeign aR asm f xs              -> aforeignL aR asm f xs
     -- Acond p xs ys                     -> undefined
     -- Awhile p f xs                     -> undefined
     -- Atrace m xs ys                    -> undefined
