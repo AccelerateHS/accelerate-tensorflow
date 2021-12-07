@@ -68,11 +68,11 @@ run | FetchableDict <- fetchableDict @arrs
 -- | Prepare an embedded array program for execution on the default
 -- TensorFlow backend
 --
-runN :: forall f. Afunction f => f -> AfunctionR f
-runN acc =
+runN :: forall f. Afunction f => f -> [[Int]] -> AfunctionR f
+runN acc shapes =
   let
       !afun  = convertAfun acc
-      !model = buildAfun afun
+      !model = buildAfun shapes afun
 
       eval :: AfunctionRepr g (AfunctionR g) (ArraysFunctionR g)
            -> OpenTfun aenv (ArraysFunctionR g)

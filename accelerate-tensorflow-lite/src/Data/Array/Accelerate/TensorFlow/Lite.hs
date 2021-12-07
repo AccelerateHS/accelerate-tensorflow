@@ -46,12 +46,14 @@ import System.IO.Unsafe
 import Text.Printf
 import qualified Data.Vector.Storable                               as V
 
+-- TODO: use a better type for this, some ADT with dimensionality information (like Accelerate's Shape?)
+type Shapes = [[Int]]
 
-runN :: forall f. Afunction f => f -> AfunctionR f
-runN acc =
+runN :: forall f. Afunction f => f -> Shapes -> AfunctionR f
+runN acc shapes =
   let
       !afun   = convertAfun acc
-      !model  = buildAfun afun
+      !model  = buildAfun shapes afun
 
       eval :: AfunctionRepr g (AfunctionR g) (ArraysFunctionR g)
            -> OpenTfun aenv (ArraysFunctionR g)
@@ -60,15 +62,20 @@ runN acc =
            -> AfunctionR g
       eval AfunctionReprBody (Tbody funR _) _ aenv =
         let
-            go :: R.ArraysR t -> [Feed] -> State Int ([Feed], t)
-            go TupRunit         env = return (env, ())
-            go (TupRpair arrR brrR) env = do
-              (env1, a) <- go arrR env
-              (env2, b) <- go brrR env1
+            go :: R.ArraysR t -> Shapes -> [Feed] -> State Int ([Feed], t)
+            go TupRunit             shapes env = return (env, ())
+            go (TupRpair arrR brrR) shapes env = do
+              (env1, a) <- go arrR shapes env
+              (env2, b) <- go brrR shapes env1
               return (env2, (a, b))
-            go (TupRsingle arrR@(R.ArrayR shR eR)) env = state $ \i ->
+            go (TupRsingle arrR@(R.ArrayR shR eR)) (ssh:sshs) env = state $ \i ->
               let
-                  sh                    = R.listToShape shR (repeat 256) -- TODO: figure out actual tensor size!
+                  -- TODO: figure out actual size from the program; this is the
+                  -- output, and therefore, we need to know the output shape,
+                  -- which we should be able to infer from the input shapes.
+                  -- For now, we just assume that any and all outputs have the
+                  -- same shape as the _first_ input!
+                  sh                    = R.listToShape shR ssh
                   arr@(R.Array _ adata) = unsafePerformIO $ R.allocateArray arrR sh
                   env'                  = evalState (array eR adata) 0
 
@@ -115,7 +122,7 @@ runN acc =
               in
               ((env' ++ env, arr), i+1)
 
-            (aenv', out) = evalState (go funR []) 0
+            (aenv', out) = evalState (go funR shapes []) 0
         in
         unsafePerformIO $ do
           path <- compileTfun model

@@ -63,11 +63,11 @@ import qualified Data.Text                                          as T
 buildAcc :: Acc a -> Tensors a
 buildAcc acc = buildOpenAcc Aempty acc
 
-buildAfun :: Afun f -> Tfun f
-buildAfun f = evalState (buildOpenAfun Aempty f) 0
+buildAfun :: [[Int]] -> Afun f -> Tfun f
+buildAfun shapes f = evalState (buildOpenAfun shapes Aempty f) 0
 
-buildOpenAfun :: Aval aenv -> OpenAfun aenv f -> State Int (OpenTfun aenv f)
-buildOpenAfun aenv (Alam lhs f) = do
+buildOpenAfun :: [[Int]] -> Aval aenv -> OpenAfun aenv f -> State Int (OpenTfun aenv f)
+buildOpenAfun (sh:shs) aenv (Alam lhs f) = do
   let
       go :: ALeftHandSide t aenv aenv' -> Aval aenv -> State Int (Aval aenv')
       go LeftHandSideWildcard{}                      env = return env
@@ -119,17 +119,18 @@ buildOpenAfun aenv (Alam lhs f) = do
                 placeholder :: TF.TensorType t => State Int (TF.Tensor TF.Build t)
                 placeholder = state $ \j ->
                   let opName = TF.opName .~ TF.explicitName (T.pack (printf "input%d_adata%d" i j))
-                      setShape = TF.opAttr "shape" .~ TF.Shape [5] -- TODO: Find correct shape
+                      setShape = TF.opAttr "shape" .~ TF.Shape (fromIntegral <$> sh) -- TODO: Find correct shape from program
                   in  (TF.placeholder' (setShape . opName), j+1)
         in
         (env `Apush` Tensor arrR sh' adata', i+1)
 
   --
   aenv' <- go lhs aenv
-  f'    <- buildOpenAfun aenv' f
+  f'    <- buildOpenAfun shs aenv' f
   return $ Tlam lhs f'
 --
-buildOpenAfun aenv (Abody f) =
+buildOpenAfun [] aenv (Alam _ _) = error "Not enough shapes for arguments"
+buildOpenAfun shapes aenv (Abody f) =
   let
       go :: ArraysR t -> Tensors t -> State Int (Tensors t)
       go TupRunit              ()                                     = return ()
