@@ -17,6 +17,8 @@
 module Data.Array.Accelerate.TensorFlow.Lite
   where
 
+import Prelude as P
+
 import Data.Array.Accelerate.AST
 import Data.Array.Accelerate.AST.LeftHandSide
 import Data.Array.Accelerate.Array.Data
@@ -49,11 +51,11 @@ import qualified Data.Vector.Storable                               as V
 -- TODO: use a better type for this, some ADT with dimensionality information (like Accelerate's Shape?)
 type Shapes = [[Int]]
 
-runN :: forall f. Afunction f => f -> Shapes -> AfunctionR f
-runN acc shapes =
+runN :: forall f. Afunction f => f -> Shapes -> Shapes -> AfunctionR f
+runN acc inshapes outshapes =
   let
       !afun   = convertAfun acc
-      !model  = buildAfun shapes afun
+      !model  = buildAfun inshapes outshapes afun
 
       eval :: AfunctionRepr g (AfunctionR g) (ArraysFunctionR g)
            -> OpenTfun aenv (ArraysFunctionR g)
@@ -74,7 +76,7 @@ runN acc shapes =
                   -- output, and therefore, we need to know the output shape,
                   -- which we should be able to infer from the input shapes.
                   -- For now, we just assume that any and all outputs have the
-                  -- same shape as the _first_ input!
+                  -- same shape as the _first_ output!
                   sh                    = R.listToShape shR ssh
                   arr@(R.Array _ adata) = unsafePerformIO $ R.allocateArray arrR sh
                   env'                  = evalState (array eR adata) 0
@@ -122,7 +124,7 @@ runN acc shapes =
               in
               ((env' ++ env, arr), i+1)
 
-            (aenv', out) = evalState (go funR shapes []) 0
+            (aenv', out) = evalState (go funR outshapes []) 0
         in
         unsafePerformIO $ do
           path <- compileTfun model
