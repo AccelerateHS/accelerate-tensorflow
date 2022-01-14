@@ -29,9 +29,12 @@ import Data.Array.Accelerate.TensorFlow.CodeGen.AST
 import Data.Array.Accelerate.TensorFlow.CodeGen.Base
 import Data.Array.Accelerate.TensorFlow.CodeGen.Environment
 import Data.Array.Accelerate.TensorFlow.CodeGen.Exp
+import Data.Array.Accelerate.TensorFlow.CodeGen.Foreign
 import Data.Array.Accelerate.TensorFlow.CodeGen.Tensor
 
 import Data.Array.Accelerate.AST
+import Data.Array.Accelerate.AST.Environment                        ( weakenEmpty )
+import Data.Array.Accelerate.AST.Idx
 import Data.Array.Accelerate.AST.LeftHandSide
 import Data.Array.Accelerate.AST.Var
 import Data.Array.Accelerate.Array.Data
@@ -41,6 +44,8 @@ import Data.Array.Accelerate.Representation.Array                   hiding ( sha
 import Data.Array.Accelerate.Representation.Shape
 import Data.Array.Accelerate.Representation.Slice
 import Data.Array.Accelerate.Representation.Type
+import Data.Array.Accelerate.Sugar.Foreign
+import Data.Array.Accelerate.Trafo.Substitution
 import Data.Array.Accelerate.Type
 
 import Data.ProtoLens.Default                                       ( def )
@@ -56,6 +61,7 @@ import qualified TensorFlow.Types                                   as TF
 
 import Control.Monad.State
 import Data.ByteString.Internal                                     as B
+import Data.Typeable
 import Foreign.ForeignPtr
 import Foreign.Storable
 import Text.Printf
@@ -126,7 +132,6 @@ buildOpenAfun (ish:ishs) oshs aenv (Alam lhs f) = do
                   in  (TF.placeholder' (setShape . opName), j+1)
         in
         (env `Apush` Tensor arrR sh' adata', i+1)
-
   --
   aenv' <- go lhs aenv
   f'    <- buildOpenAfun ishs oshs aenv' f
@@ -309,7 +314,9 @@ buildOpenAcc aenv (OpenAcc pacc) =
         Tensor (ArrayR shR eR) sh' e'
 
       generateL :: ArrayR (Array sh e) -> Exp aenv sh -> Fun aenv (sh -> e) -> Tensor sh e
-      generateL = undefined
+      generateL aR sh f
+        | Lam LeftHandSideWildcard{} (Body e) <- f = fillL aR sh e
+        | otherwise                                = unsupported "generate"
 
       replicateL
           :: SliceIndex slix sl co sh
@@ -336,10 +343,10 @@ buildOpenAcc aenv (OpenAcc pacc) =
             pad (SliceAll sliceIdx)   (sl, sz) = (pad sliceIdx sl, sz)
             pad (SliceFixed sliceIdx) sl       = (pad sliceIdx sl, TF.scalar 1)
 
-            go :: TypeR s -> TensorArrayData s -> TensorArrayData s
-            go TupRunit         ()     = ()
-            go (TupRpair aR bR) (a, b) = (go aR a, go bR b)
-            go (TupRsingle aR)  a      =
+            array :: TypeR s -> TensorArrayData s -> TensorArrayData s
+            array TupRunit         ()     = ()
+            array (TupRpair aR bR) (a, b) = (array aR a, array bR b)
+            array (TupRsingle aR)  a      =
               let
                   scalar :: ScalarType s -> TensorArrayData s -> TensorArrayData s
                   scalar (SingleScalarType t) = single t
@@ -371,7 +378,147 @@ buildOpenAcc aenv (OpenAcc pacc) =
               in
               scalar aR a
         in
-        Tensor (ArrayR shR eR) sh' (go eR e')
+        Tensor (ArrayR shR eR) sh' (array eR e')
+
+      foldL :: Fun aenv (e -> e -> e)
+            -> Maybe (Exp aenv e)
+            -> OpenAcc aenv (Array (sh, Int) e)
+            -> Tensor sh e
+      foldL f z xs
+        | Lam LeftHandSideSingle{} (Lam LeftHandSideSingle{} (Body b)) <- f
+        , PrimApp (PrimAdd _) (Pair x y)                               <- b
+        , Evar (Var _ (SuccIdx ZeroIdx))                               <- x
+        , Evar (Var _ ZeroIdx)                                         <- y
+        , True <- case z of
+            Nothing -> True
+            Just (Const (SingleScalarType (NumSingleType n)) v)
+              | IntegralNumType t <- n, IntegralDict <- integralDict t -> v == 0
+              | FloatingNumType t <- n, FloatingDict <- floatingDict t -> v == 0
+            _ -> False
+        = sumL xs
+
+        | otherwise
+        = unsupported "fold"
+
+      sumL :: OpenAcc aenv (Array (sh, Int) e)
+           -> Tensor sh e
+      sumL acc =
+        let Tensor (ArrayR (ShapeRsnoc shR') eR) (sh', _) xs' = buildA acc
+
+            array :: TypeR t -> TensorArrayData t -> TensorArrayData t
+            array TupRunit        () = ()
+            array TupRpair{}      _  = unsupported "sum: product types"
+            array (TupRsingle aR) a  =
+              let
+                  scalar :: ScalarType t -> TensorArrayData t -> TensorArrayData t
+                  scalar (SingleScalarType t) = single t
+                  scalar (VectorScalarType _) = unsupported "SIMD-vector types"
+
+                  single :: SingleType t -> TensorArrayData t -> TensorArrayData t
+                  single (NumSingleType t) = num t
+
+                  num :: NumType t -> TensorArrayData t -> TensorArrayData t
+                  num (IntegralNumType t) = integral t
+                  num (FloatingNumType t) = floating t
+
+                  integral :: IntegralType t -> TensorArrayData t -> TensorArrayData t
+                  integral TypeInt8   x = TF.sum x (TF.scalar @Int32 (fromIntegral (rank shR')))
+                  integral TypeInt16  x = TF.sum x (TF.scalar @Int32 (fromIntegral (rank shR')))
+                  integral TypeInt32  x = TF.sum x (TF.scalar @Int32 (fromIntegral (rank shR')))
+                  integral TypeInt64  x = TF.sum x (TF.scalar @Int32 (fromIntegral (rank shR')))
+                  integral TypeWord8  x = TF.sum x (TF.scalar @Int32 (fromIntegral (rank shR')))
+                  integral TypeWord16 x = TF.sum x (TF.scalar @Int32 (fromIntegral (rank shR')))
+                  integral TypeWord32 x = TF.sum x (TF.scalar @Int32 (fromIntegral (rank shR')))
+                  integral TypeWord64 x = TF.sum x (TF.scalar @Int32 (fromIntegral (rank shR')))
+                  integral TypeInt    x = TF.sum x (TF.scalar @Int32 (fromIntegral (rank shR')))
+                  integral TypeWord   x = TF.sum x (TF.scalar @Int32 (fromIntegral (rank shR')))
+
+                  floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t
+                  floating TypeFloat  x = TF.sum x (TF.scalar @Int32 (fromIntegral (rank shR')))
+                  floating TypeDouble x = TF.sum x (TF.scalar @Int32 (fromIntegral (rank shR')))
+                  floating TypeHalf   _ = unsupported "half-precision floating point"
+              in
+              scalar aR a
+        in
+        Tensor (ArrayR shR' eR) sh' (array eR xs')
+
+      backpermuteL
+          :: ShapeR sh'
+          -> Exp aenv sh'
+          -> Fun aenv (sh' -> sh)
+          -> OpenAcc aenv (Array sh e)
+          -> Tensor sh' e
+      backpermuteL shR' _sh' p acc
+        | ArrayR shR _                    <- arrayR acc
+        , ShapeRsnoc (ShapeRsnoc ShapeRz) <- shR
+        , ShapeRsnoc (ShapeRsnoc ShapeRz) <- shR'
+        , Lam _ (Body b)                  <- p
+        , Pair (Pair Nil x) y             <- b
+        , Evar (Var _ ZeroIdx)            <- x
+        , Evar (Var _ (SuccIdx ZeroIdx))  <- y
+        -- TODO: check the result shape?
+        = transposeL acc
+
+        | otherwise
+        = unsupported "backpermute"
+
+      transposeL
+          :: OpenAcc aenv (Array DIM2 e)
+          -> Tensor DIM2 e
+      transposeL acc =
+        let Tensor (ArrayR shR eR) (((), h),w) xs = buildA acc
+
+            array :: TypeR t -> TensorArrayData t -> TensorArrayData t
+            array TupRunit         ()     = ()
+            array (TupRpair aR bR) (a, b) = (array aR a, array bR b)
+            array (TupRsingle aR)  a      =
+              let
+                  scalar :: ScalarType t -> TensorArrayData t -> TensorArrayData t
+                  scalar (SingleScalarType t) = single t
+                  scalar (VectorScalarType _) = unsupported "SIMD-vector types"
+
+                  single :: SingleType t -> TensorArrayData t -> TensorArrayData t
+                  single (NumSingleType t) = num t
+
+                  num :: NumType t -> TensorArrayData t -> TensorArrayData t
+                  num (IntegralNumType t) = integral t
+                  num (FloatingNumType t) = floating t
+
+                  integral :: IntegralType t -> TensorArrayData t -> TensorArrayData t
+                  integral TypeInt8   x = TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])
+                  integral TypeInt16  x = TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])
+                  integral TypeInt32  x = TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])
+                  integral TypeInt64  x = TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])
+                  integral TypeWord8  x = TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])
+                  integral TypeWord16 x = TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])
+                  integral TypeWord32 x = TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])
+                  integral TypeWord64 x = TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])
+                  integral TypeInt    x = TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])
+                  integral TypeWord   x = TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])
+
+                  floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t
+                  floating TypeFloat  x = TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])
+                  floating TypeDouble x = TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])
+                  floating TypeHalf   _ = unsupported "half-precision floating point"
+              in
+              scalar aR a
+        in
+        Tensor (ArrayR shR eR) (((), w), h) (array eR xs)
+
+      aforeignL
+          :: forall asm a b. Foreign asm
+          => ArraysR b
+          -> asm (a -> b)
+          -> Afun (a -> b)
+          -> OpenAcc aenv a
+          -> Tensors b
+      aforeignL bR asm g a
+        | Just Refl      <- eqT @asm @ForeignAcc
+        , ForeignAcc _ f <- asm
+        = f (buildOpenAcc aenv a)
+
+        | otherwise
+        = buildOpenAcc aenv (OpenAcc $ Apply bR (weaken weakenEmpty g) a)
   in
   case pacc of
     Alet lhs bnd body                 -> aletL lhs bnd body
@@ -379,7 +526,7 @@ buildOpenAcc aenv (OpenAcc pacc) =
     Apair xs ys                       -> (buildOpenAcc aenv xs, buildOpenAcc aenv ys)
     Anil                              -> ()
     -- Apply aR f xs                     -> undefined
-    -- Aforeign aR asm f xs              -> undefined
+    Aforeign aR asm f xs              -> aforeignL aR asm f xs
     -- Acond p xs ys                     -> undefined
     -- Awhile p f xs                     -> undefined
     -- Atrace m xs ys                    -> undefined
@@ -392,12 +539,12 @@ buildOpenAcc aenv (OpenAcc pacc) =
     -- Slice sliceIndex sh slix          -> undefined
     Map bR f xs                       -> mapL bR f xs
     ZipWith cR f xs ys                -> zipWithL cR f xs ys
-    -- Fold f z xs                       -> undefined
+    Fold f z xs                       -> foldL f z xs
     -- FoldSeg iR f z xs ss              -> undefined
     -- Scan dir f z xs                   -> undefined
     -- Scan' dir f z xs                  -> undefined
     -- Permute f d p xs                  -> undefined
-    -- Backpermute shR sh p xs           -> undefined
+    Backpermute shR sh p xs           -> backpermuteL shR sh p xs
     -- Stencil sR tR f b xs              -> undefined
     -- Stencil2 sR1 sR2 tR f b1 xs b2 ys -> undefined
 

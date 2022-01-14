@@ -33,6 +33,7 @@ import Data.Array.Accelerate.Lifetime
 import Data.Array.Accelerate.Representation.Type
 import Data.Array.Accelerate.Sugar.Array
 import Data.Array.Accelerate.Trafo.Sharing
+import Data.Array.Accelerate.Trafo.Simplify
 import Data.Array.Accelerate.Type
 import qualified Data.Array.Accelerate.Representation.Array         as R
 import qualified Data.Array.Accelerate.Representation.Shape         as R
@@ -63,6 +64,7 @@ run | FetchableDict <- fetchableDict @arrs
     = toArr
     . unsafePerformIO . TF.runSession . TF.run
     . buildAcc
+    . simplifyAcc
     . convertAcc
 
 -- | Prepare an embedded array program for execution on the default
@@ -71,8 +73,10 @@ run | FetchableDict <- fetchableDict @arrs
 runN :: forall f. Afunction f => f -> [[Int]] -> [[Int]] -> AfunctionR f
 runN acc ishapes oshapes =
   let
-      !afun  = convertAfun acc
       !model = buildAfun ishapes oshapes afun
+      !afun  = simplifyAfun
+             . convertAfun
+             $ acc
 
       eval :: AfunctionRepr g (AfunctionR g) (ArraysFunctionR g)
            -> OpenTfun aenv (ArraysFunctionR g)
