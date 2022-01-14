@@ -70,10 +70,10 @@ run | FetchableDict <- fetchableDict @arrs
 -- | Prepare an embedded array program for execution on the default
 -- TensorFlow backend
 --
-runN :: forall f. Afunction f => f -> AfunctionR f
-runN acc =
+runN :: forall f. Afunction f => f -> [[Int]] -> [[Int]] -> AfunctionR f
+runN acc ishapes oshapes =
   let
-      !model = buildAfun afun
+      !model = buildAfun ishapes oshapes afun
       !afun  = simplifyAfun
              . convertAfun
              $ acc
