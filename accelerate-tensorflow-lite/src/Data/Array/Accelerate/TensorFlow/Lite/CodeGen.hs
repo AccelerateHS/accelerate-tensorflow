@@ -113,8 +113,7 @@ buildOpenAfunWith aenv (Alam lhs f) (Aparam xR x xs)
   f'    <- buildOpenAfunWith aenv' f xs
   return $ Tlam lhs f'
 --
-buildOpenAfunWith aenv (Abody f) (Aresult fR sr)
-  | Just Refl <- matchArraysR fR (arraysR f)
+buildOpenAfunWith aenv (Abody f) (Aresult _ rsh)
   = let
         go :: ArraysR t -> Shapes t -> Tensors t -> State Int (Tensors t)
         go TupRunit              ()         ()                                  = return ()
@@ -176,9 +175,9 @@ buildOpenAfunWith aenv (Abody f) (Aresult fR sr)
           in
           (Tensor (ArrayR shR eR) sh' adata', i+1)
 
-        f' = evalState (go fR sr (buildOpenAcc aenv f)) 0
+        f' = evalState (go (arraysR f) rsh (buildOpenAcc aenv f)) 0
   in
-  return $ Tbody fR f'
+  return $ Tbody (arraysR f) f'
 --
 buildOpenAfunWith _ _ _ =
   error "impossible"

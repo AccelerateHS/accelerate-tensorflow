@@ -15,33 +15,43 @@
 -- Portability : non-portable (GHC extensions)
 --
 
-module Data.Array.Accelerate.TensorFlow.Lite
-  where
+module Data.Array.Accelerate.TensorFlow.Lite (
 
-import Data.Array.Accelerate.AST                                    as AST
+  Smart.Acc, Sugar.Arrays,
+  Afunction, AfunctionR,
+  Model, RepresentativeData, NonEmpty(..), Args(..),
+
+  compile,
+  execute,
+
+) where
+
+import Data.Array.Accelerate.AST                                              as AST
 import Data.Array.Accelerate.AST.LeftHandSide
 import Data.Array.Accelerate.Array.Data
 import Data.Array.Accelerate.Array.Unique
 import Data.Array.Accelerate.Lifetime
-import Data.Array.Accelerate.Representation.Array                   as R ( ArraysR )
+import Data.Array.Accelerate.Representation.Array                             as R ( ArraysR )
 import Data.Array.Accelerate.Representation.Type
-import Data.Array.Accelerate.Sugar.Array                            as Sugar
+import Data.Array.Accelerate.Sugar.Array                                      as Sugar
 import Data.Array.Accelerate.Trafo.Sharing
 import Data.Array.Accelerate.Type
-import qualified Data.Array.Accelerate.Representation.Array         as R
-import qualified Data.Array.Accelerate.Representation.Shape         as R
+import qualified Data.Array.Accelerate.Representation.Array                   as R
+import qualified Data.Array.Accelerate.Representation.Shape                   as R
+import qualified Data.Array.Accelerate.Smart                                  as Smart
 
 import Data.Array.Accelerate.TensorFlow.CodeGen.Base
 
 import Data.Array.Accelerate.TensorFlow.Lite.CodeGen
 import Data.Array.Accelerate.TensorFlow.Lite.Compile
-import qualified Data.Array.Accelerate.TensorFlow.Lite.Representation.Args         as R
-import qualified Data.Array.Accelerate.TensorFlow.Lite.Representation.Shapes       as R
+import Data.Array.Accelerate.TensorFlow.Lite.Sugar.Args
+import qualified Data.Array.Accelerate.TensorFlow.Lite.Representation.Args    as R
+import qualified Data.Array.Accelerate.TensorFlow.Lite.Representation.Shapes  as R
 
 import Control.Monad.State
-import Data.ByteString                                              ( ByteString )
-import Data.List                                                    ( genericLength )
-import Data.List.NonEmpty                                           ( NonEmpty(..) )
+import Data.ByteString                                                        ( ByteString )
+import Data.List                                                              ( genericLength )
+import Data.List.NonEmpty                                                     ( NonEmpty(..) )
 import Foreign.C.String
 import Foreign.ForeignPtr
 import Foreign.Marshal.Array
@@ -50,35 +60,42 @@ import Foreign.Ptr
 import Foreign.Storable
 import System.IO.Unsafe
 import Text.Printf
-import qualified Data.ByteString.Unsafe                             as B
-import qualified Data.Vector.Storable                               as V
-import Prelude                                                      as P
+import qualified Data.ByteString.Unsafe                                       as B
+import qualified Data.Vector.Storable                                         as V
+import Prelude                                                                as P
 
 
+-- | A compiled and quantized model to be used for inference.
+--
 data Model f where
-  Model :: OpenAfun aenv (ArraysFunctionR f)
-        -> R.Args (ArraysFunctionR f)     -- TODO: simplify: only want the shape information at the end
-        -> ByteString                     -- model data as a buffer
+  Model :: OpenAfun aenv (ArraysFunctionR f)  -- TODO: simplify: only need the structure
+        -> R.Args (ArraysFunctionR f)         -- TODO: simplify: only want the shape information at the end
+        -> ByteString                         -- model data as a buffer
         -> Model f
 
 
--- | Compile a tensorflow model for the edge-tpu, given representative data
--- to be used in the quantisation process. The representative data set is
--- typically a subset of the data set that was used for training.
+-- | A representative data set for a given tensor computation. This
+-- typically consists of a subset of the data that was used for training.
 --
--- TODO: some method for collecting the arguments of a given Afunction
+type RepresentativeData f = NonEmpty (Args f)
+
+
+-- | Compile a TensorFlow model for the EdgeTPU. The given representative
+-- data is used in the quantisation process.
 --
-compile :: forall f. Afunction f => f -> NonEmpty (R.Args (ArraysFunctionR f)) -> IO (Model f)
-compile acc (x :| xs) = Model afun x <$> compileTfunWith model (x:xs)
+compile :: forall f. Afunction f => f -> RepresentativeData (AfunctionR f) -> IO (Model f)
+compile acc args = Model afun x <$> compileTfunWith model (x:xs)
   where
-    !afun  = convertAfun acc
-    !model = buildAfunWith afun x
+    !afun   = convertAfun acc
+    !afunR  = afunctionRepr @f
+    !model  = buildAfunWith afun x
+    x :| xs = fmap (fromArgs afunR) args
 
 
 -- | Run a previously compiled model
 --
-run :: forall f. Afunction f => Model f -> AfunctionR f
-run (Model afun args buffer) = eval (afunctionRepr @f) afun args 0 []
+execute :: forall f. Afunction f => Model f -> AfunctionR f
+execute (Model afun args buffer) = eval (afunctionRepr @f) afun args 0 []
   where
     eval :: AfunctionRepr g (AfunctionR g) (ArraysFunctionR g)
          -> OpenAfun aenv (ArraysFunctionR g)

@@ -20,7 +20,6 @@ module Data.Array.Accelerate.TensorFlow.Lite.Representation.Args
   where
 
 import Data.Array.Accelerate.TensorFlow.CodeGen.Base
-
 import Data.Array.Accelerate.TensorFlow.Lite.Representation.Shapes
 
 import Data.Array.Accelerate.Array.Data
@@ -29,10 +28,7 @@ import Data.Array.Accelerate.Lifetime
 import Data.Array.Accelerate.Representation.Array
 import Data.Array.Accelerate.Representation.Shape
 import Data.Array.Accelerate.Representation.Type
-import Data.Array.Accelerate.Trafo.Sharing
 import Data.Array.Accelerate.Type
-import Data.Array.Accelerate.Smart                                  ( Acc )
-import qualified Data.Array.Accelerate.Sugar.Array                  as Sugar
 
 import Foreign.ForeignPtr
 import Foreign.Storable
@@ -45,14 +41,9 @@ import qualified Data.ByteString.Internal                           as B
 
 data Args f where
   Aparam  :: ArraysR a -> a -> Args b -> Args (a -> b)
-  Aresult :: ArraysR a -> Shapes a   -> Args a
+  Aresult :: ShapesR a -> Shapes a    -> Args a
 
 
--- buildArgs
---     :: AfunctionRepr f (AfunctionR f) (ArraysFunctionR f)
---     -> Args (ArraysFunctionR f)
---     -> Builder
--- buildArgs afunR args =
 buildArgs :: Args f -> Builder
 buildArgs args =
   let
@@ -64,15 +55,6 @@ buildArgs args =
           go TupRunit         = 0
           go TupRsingle{}     = 1
           go (TupRpair aR bR) = go aR + go bR
-
-      -- count' :: AfunctionRepr g (AfunctionR g) (ArraysFunctionR g) -> Word8
-      -- count' AfunctionReprBody       = 0
-      -- count' ((AfunctionReprLam lamR) :: AfunctionRepr (Acc a -> b) (a -> br) (Sugar.ArraysR a -> breprr)) = go (Sugar.arraysR @a) + count' lamR
-      --   where
-      --     go :: ArraysR t -> Word8
-      --     go TupRunit         = 0
-      --     go TupRsingle{}     = 1
-      --     go (TupRpair aR bR) = go aR + go bR
 
       tensors :: Args a -> Builder
       tensors Aresult{}              = mempty

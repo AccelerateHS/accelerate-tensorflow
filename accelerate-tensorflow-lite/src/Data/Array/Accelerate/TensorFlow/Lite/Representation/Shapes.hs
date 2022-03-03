@@ -15,18 +15,12 @@ module Data.Array.Accelerate.TensorFlow.Lite.Representation.Shapes
 import Data.Array.Accelerate.Representation.Array
 import Data.Array.Accelerate.Representation.Shape
 import Data.Array.Accelerate.Representation.Type
-import Data.Array.Accelerate.Representation.Type
 
 
-type ShapesR = TupR ShapeR
+type ShapesR a = TupR ShapeR (Shapes a)
 
 type family Shapes t where
   Shapes ()           = ()
   Shapes (Array sh e) = sh
   Shapes (a, b)       = (Shapes a, Shapes b)
-
--- shapes :: ArraysR a -> a -> ShapesR a
--- shapes TupRunit              ()           = ()
--- shapes (TupRpair aR bR)      (a, b)       = (shapes aR a, shapes bR b)
--- shapes (TupRsingle ArrayR{}) (Array sh _) = sh
 
