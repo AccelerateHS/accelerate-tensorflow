@@ -34,6 +34,7 @@ library
   other-modules:
       Data.Array.Accelerate.TensorFlow.Lite.CodeGen
       Data.Array.Accelerate.TensorFlow.Lite.Compile
+      Data.Array.Accelerate.TensorFlow.Lite.Model
       Data.Array.Accelerate.TensorFlow.Lite.Representation.Args
       Data.Array.Accelerate.TensorFlow.Lite.Representation.Shapes
       Data.Array.Accelerate.TensorFlow.Lite.Sugar.Args

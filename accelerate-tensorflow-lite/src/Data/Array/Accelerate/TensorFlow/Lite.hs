@@ -44,12 +44,12 @@ import Data.Array.Accelerate.TensorFlow.CodeGen.Base
 
 import Data.Array.Accelerate.TensorFlow.Lite.CodeGen
 import Data.Array.Accelerate.TensorFlow.Lite.Compile
+import Data.Array.Accelerate.TensorFlow.Lite.Model
 import Data.Array.Accelerate.TensorFlow.Lite.Sugar.Args
 import qualified Data.Array.Accelerate.TensorFlow.Lite.Representation.Args    as R
 import qualified Data.Array.Accelerate.TensorFlow.Lite.Representation.Shapes  as R
 
 import Control.Monad.State
-import Data.ByteString                                                        ( ByteString )
 import Data.List                                                              ( genericLength )
 import Data.List.NonEmpty                                                     ( NonEmpty(..) )
 import Foreign.C.String
@@ -65,14 +65,6 @@ import qualified Data.Vector.Storable                                         as
 import Prelude                                                                as P
 
 
--- | A compiled and quantized model to be used for inference.
---
-data Model f where
-  Model :: OpenAfun aenv (ArraysFunctionR f)  -- TODO: simplify: only need the structure
-        -> R.Args (ArraysFunctionR f)         -- TODO: simplify: only want the shape information at the end
-        -> ByteString                         -- model data as a buffer
-        -> Model f
-
 
 -- | A representative data set for a given tensor computation. This
 -- typically consists of a subset of the data that was used for training.
@@ -83,27 +75,26 @@ type RepresentativeData f = NonEmpty (Args f)
 -- | Compile a TensorFlow model for the EdgeTPU. The given representative
 -- data is used in the quantisation process.
 --
-compile :: forall f. Afunction f => f -> RepresentativeData (AfunctionR f) -> IO (Model f)
-compile acc args = Model afun x <$> compileTfunWith model (x:xs)
+compile :: forall f. Afunction f => f -> RepresentativeData (AfunctionR f) -> Model (AfunctionR f)
+compile acc args = unsafePerformIO $ Model afunR (modelAfun afunR tfun x) <$> compileTfunWith tfun (x:xs)
   where
-    !afun   = convertAfun acc
     !afunR  = afunctionRepr @f
-    !model  = buildAfunWith afun x
+    !afun   = convertAfun acc
+    !tfun   = buildAfunWith afun x
     x :| xs = fmap (fromArgs afunR) args
 
 
 -- | Run a previously compiled model
 --
-execute :: forall f. Afunction f => Model f -> AfunctionR f
-execute (Model afun args buffer) = eval (afunctionRepr @f) afun args 0 []
+execute :: Model f -> f
+execute (Model afunR fun buffer) = eval afunR fun 0 []
   where
-    eval :: AfunctionRepr g (AfunctionR g) (ArraysFunctionR g)
-         -> OpenAfun aenv (ArraysFunctionR g)
-         -> R.Args (ArraysFunctionR g)
+    eval :: AfunctionRepr a f r
+         -> ModelAfun r
          -> Int
          -> [Feed]
-         -> AfunctionR g
-    eval AfunctionReprBody (Abody body) (R.Aresult _ shOut) _ aenv =
+         -> f
+    eval AfunctionReprBody (Mbody outR shOut) _ aenv =
       let
           go :: R.ArraysR t -> R.Shapes t -> [Feed] -> StateT Int IO ([Feed], t)
           go TupRunit         ()         env = return (env, ())
@@ -159,12 +150,12 @@ execute (Model afun args buffer) = eval (afunctionRepr @f) afun args 0 []
             return ((evalState (array eR adata) 0 ++ env, arr), i+1)
       in
       unsafePerformIO $ do
-        (aenv', out) <- evalStateT (go (AST.arraysR body) shOut []) 0
+        (aenv', out) <- evalStateT (go outR shOut []) 0
         B.unsafeUseAsCStringLen buffer $ \(p, n) ->
           withFeeds (aenv ++ aenv') (edgetpu_run p (fromIntegral n))
         return $ toArr out
 
-    eval (AfunctionReprLam lamR) (Alam lhs f) (R.Aparam _ _ xs) skip aenv = \arr ->
+    eval (AfunctionReprLam lamR) (Mlam lhs f) skip aenv = \arr ->
       let
           go :: ALeftHandSide t aenv aenv' -> t -> [Feed] -> State Int [Feed]
           go LeftHandSideWildcard{}                 _                  env = return env
@@ -231,8 +222,8 @@ execute (Model afun args buffer) = eval (afunctionRepr @f) afun args 0 []
 
           (aenv', next) = runState (go lhs (fromArr arr) aenv) skip
       in
-      eval lamR f xs next aenv'
-    eval _ _ _ _ _ = error "impossible"
+      eval lamR f next aenv'
+    eval _ _ _ _ = error "impossible"
 
 
 data Feed = Feed { tensorName      :: String
