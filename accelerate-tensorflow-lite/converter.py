@@ -96,7 +96,7 @@ def read_array(f):
 
     array_data = []
     for _ in range(component_count):
-        (bytes_per_elem, str_format, numpy_type) = read_datatype(f)
+        (bytes_per_elem, str_format, numpy_dtype) = read_datatype(f)
         data = bytearray(size * bytes_per_elem)
         f.readinto(data)
         array_data.append(np.array(struct.unpack(str_format * size, data), dtype=numpy_dtype))
