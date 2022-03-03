@@ -19,7 +19,7 @@ module Data.Array.Accelerate.TensorFlow.Lite (
 
   Smart.Acc, Sugar.Arrays,
   Afunction, AfunctionR,
-  Model, RepresentativeData, NonEmpty(..), Args(..),
+  Model, RepresentativeData, Args(..),
 
   compile,
   execute,
@@ -51,7 +51,6 @@ import qualified Data.Array.Accelerate.TensorFlow.Lite.Representation.Shapes  as
 
 import Control.Monad.State
 import Data.List                                                              ( genericLength )
-import Data.List.NonEmpty                                                     ( NonEmpty(..) )
 import Foreign.C.String
 import Foreign.ForeignPtr
 import Foreign.Marshal.Array
@@ -65,11 +64,10 @@ import qualified Data.Vector.Storable                                         as
 import Prelude                                                                as P
 
 
-
 -- | A representative data set for a given tensor computation. This
 -- typically consists of a subset of the data that was used for training.
 --
-type RepresentativeData f = NonEmpty (Args f)
+type RepresentativeData f = [Args f]
 
 
 -- | Compile a TensorFlow model for the EdgeTPU. The given representative
@@ -78,10 +76,10 @@ type RepresentativeData f = NonEmpty (Args f)
 compile :: forall f. Afunction f => f -> RepresentativeData (AfunctionR f) -> Model (AfunctionR f)
 compile acc args = unsafePerformIO $ Model afunR (modelAfun afunR tfun x) <$> compileTfunWith tfun (x:xs)
   where
-    !afunR  = afunctionRepr @f
-    !afun   = convertAfun acc
-    !tfun   = buildAfunWith afun x
-    x :| xs = fmap (fromArgs afunR) args
+    !afunR = afunctionRepr @f
+    !afun  = convertAfun acc
+    !tfun  = buildAfunWith afun x
+    x:xs   = map (fromArgs afunR) args
 
 
 -- | Run a previously compiled model
