@@ -10,6 +10,8 @@ extra-source-files:
 - ../README.md
 - ../CHANGELOG.md
 - cbits/edgetpu.*
+
+data-files:
 - converter.py
 
 # Metadata used when publishing your package
@@ -36,6 +38,8 @@ dependencies:
 - proto-lens
 - random
 - tensorflow
+- tensorflow-core-ops
+- tensorflow-ops
 - tensorflow-proto
 - text
 - vector

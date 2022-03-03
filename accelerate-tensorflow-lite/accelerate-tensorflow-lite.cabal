@@ -21,6 +21,7 @@ extra-source-files:
     ../CHANGELOG.md
     cbits/edgetpu.cc
     cbits/edgetpu.h
+data-files:
     converter.py
 
 source-repository head
@@ -31,7 +32,12 @@ library
   exposed-modules:
       Data.Array.Accelerate.TensorFlow.Lite
   other-modules:
+      Data.Array.Accelerate.TensorFlow.Lite.CodeGen
       Data.Array.Accelerate.TensorFlow.Lite.Compile
+      Data.Array.Accelerate.TensorFlow.Lite.Representation.Args
+      Data.Array.Accelerate.TensorFlow.Lite.Representation.Shapes
+      Data.Array.Accelerate.TensorFlow.Lite.Sugar.Args
+      Data.Array.Accelerate.TensorFlow.Lite.Sugar.Shapes
       System.IO.Temp
       System.Process.Extra
       Paths_accelerate_tensorflow_lite
@@ -58,6 +64,8 @@ library
     , proto-lens
     , random
     , tensorflow
+    , tensorflow-core-ops
+    , tensorflow-ops
     , tensorflow-proto
     , text
     , vector
