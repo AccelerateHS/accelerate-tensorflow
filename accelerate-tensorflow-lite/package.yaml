@@ -58,8 +58,6 @@ library:
 
   extra-libraries:
       stdc++
-      clog
-      cpuinfo
       edgetpu
       farmhash
       tensorflow-lite
@@ -69,6 +67,8 @@ library:
       pthreadpool
       fft2d_fftsg
       fft2d_fftsg2d
+      cpuinfo
+      clog
 
 tests:
   operation-unit-tests:
@@ -79,7 +79,10 @@ tests:
       - -O2
     dependencies:
       - accelerate-tensorflow
-      - hedgehog
+      - accelerate-tensorflow-lite
       - tasty
+      - tasty-hedgehog
+      - tasty-hunit
+      - tasty-rerun
 
 # vim: nospell

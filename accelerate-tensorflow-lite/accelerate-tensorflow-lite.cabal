@@ -42,7 +42,7 @@ library
   cxx-sources:
       cbits/edgetpu.cc
   extra-libraries:
-      stdc++ clog cpuinfo edgetpu farmhash tensorflow-lite ruy XNNPACK flatbuffers pthreadpool fft2d_fftsg fft2d_fftsg2d
+      stdc++ edgetpu farmhash tensorflow-lite ruy XNNPACK flatbuffers pthreadpool fft2d_fftsg fft2d_fftsg2d cpuinfo clog
   build-depends:
       accelerate ==1.3.*
     , accelerate-tensorflow
@@ -74,19 +74,22 @@ test-suite operation-unit-tests
   build-depends:
       accelerate ==1.3.*
     , accelerate-tensorflow
+    , accelerate-tensorflow-lite
     , base >=4.7 && <5
     , bytestring
     , deepseq
     , directory
     , filepath
     , formatting
-    , hedgehog
     , lens-family
     , mtl
     , process
     , proto-lens
     , random
     , tasty
+    , tasty-hedgehog
+    , tasty-hunit
+    , tasty-rerun
     , tensorflow
     , tensorflow-proto
     , text
