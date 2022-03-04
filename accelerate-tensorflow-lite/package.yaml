@@ -28,6 +28,7 @@ dependencies:
 - accelerate                    == 1.3.*
 - accelerate-tensorflow
 - bytestring
+- cereal
 - deepseq
 - directory
 - filepath

@@ -17,9 +17,9 @@
 
 module Data.Array.Accelerate.TensorFlow.Lite (
 
-  Smart.Acc, Sugar.Arrays,
-  Afunction, AfunctionR,
+  Smart.Acc, Sugar.Arrays, Afunction, AfunctionR,
   Model, RepresentativeData, Args(..),
+  encodeModel, decodeModel,
 
   compile,
   execute,
