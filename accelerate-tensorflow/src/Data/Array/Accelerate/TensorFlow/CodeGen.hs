@@ -18,12 +18,10 @@
 
 module Data.Array.Accelerate.TensorFlow.CodeGen (
 
-  buildAcc,
+  buildAcc, buildOpenAcc,
   buildAfun,
 
 ) where
-
-import Prelude as P
 
 import Data.Array.Accelerate.TensorFlow.CodeGen.AST
 import Data.Array.Accelerate.TensorFlow.CodeGen.Base
@@ -71,11 +69,11 @@ import qualified Data.Text                                          as T
 buildAcc :: Acc a -> Tensors a
 buildAcc acc = buildOpenAcc Aempty acc
 
-buildAfun :: [[Int]] -> [[Int]] -> Afun f -> Tfun f
-buildAfun ishapes oshapes f = evalState (buildOpenAfun ishapes oshapes Aempty f) 0
+buildAfun :: Afun f -> Tfun f
+buildAfun f = evalState (buildOpenAfun Aempty f) 0
 
-buildOpenAfun :: [[Int]] -> [[Int]] -> Aval aenv -> OpenAfun aenv f -> State Int (OpenTfun aenv f)
-buildOpenAfun (ish:ishs) oshs aenv (Alam lhs f) = do
+buildOpenAfun :: Aval aenv -> OpenAfun aenv f -> State Int (OpenTfun aenv f)
+buildOpenAfun aenv (Alam lhs f) = do
   let
       go :: ALeftHandSide t aenv aenv' -> Aval aenv -> State Int (Aval aenv')
       go LeftHandSideWildcard{}                      env = return env
@@ -125,20 +123,15 @@ buildOpenAfun (ish:ishs) oshs aenv (Alam lhs f) = do
                 floating TypeHalf   = unsupported "half-precision floating point"
 
                 placeholder :: TF.TensorType t => State Int (TF.Tensor TF.Build t)
-                placeholder = state $ \j ->
-                  let opName = TF.opName .~ TF.explicitName (T.pack (printf "input%d_adata%d" i j))
-                      -- shape' = toTfShape _shR sh'
-                      setShape = TF.opAttr "shape" .~ TF.Shape (fromIntegral <$> ish) -- TODO: Find correct shape
-                  in  (TF.placeholder' (setShape . opName), j+1)
+                placeholder = state $ \j -> (TF.placeholder' (TF.opName .~ TF.explicitName (T.pack (printf "input%d_adata%d" i j))), j+1)
         in
         (env `Apush` Tensor arrR sh' adata', i+1)
   --
   aenv' <- go lhs aenv
-  f'    <- buildOpenAfun ishs oshs aenv' f
+  f'    <- buildOpenAfun aenv' f
   return $ Tlam lhs f'
 --
-buildOpenAfun [] _ aenv (Alam _ _) = error "Not enough shapes for arguments"
-buildOpenAfun inshapes outshapes aenv (Abody f) =
+buildOpenAfun aenv (Abody f) =
   let
       go :: ArraysR t -> Tensors t -> State Int (Tensors t)
       go TupRunit              ()                                     = return ()

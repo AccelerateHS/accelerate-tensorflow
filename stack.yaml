@@ -12,10 +12,7 @@ packages:
 
 extra-deps:
 - github: tmcdonell/accelerate
-  commit: 78f512fe30bf1a366cb6b6b7fa70727adebf8c5f
-
-- accelerate-io-1.3.0.0
-- accelerate-io-bytestring-0.1.0.0
+  commit: 442746ca9d299c79046553024fd45ec2afe511a3
 
 # Stack can't handle extra-deps from github that include submodules
 - extra-deps/tensorflow-haskell/tensorflow

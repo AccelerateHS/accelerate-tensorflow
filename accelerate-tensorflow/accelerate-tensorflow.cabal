@@ -33,6 +33,7 @@ library
       Data.Array.Accelerate.TensorFlow.CodeGen.Base
       Data.Array.Accelerate.TensorFlow.CodeGen.Environment
       Data.Array.Accelerate.TensorFlow.CodeGen.Exp
+      Data.Array.Accelerate.TensorFlow.CodeGen.Foreign
       Data.Array.Accelerate.TensorFlow.CodeGen.Tensor
   other-modules:
       Paths_accelerate_tensorflow
