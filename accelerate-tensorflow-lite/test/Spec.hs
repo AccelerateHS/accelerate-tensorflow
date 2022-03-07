@@ -35,16 +35,22 @@ asAccelerateArray xs = fromList (Z :. P.length xs) xs
 mapTests :: TestTree
 mapTests = testGroup "Map Tests"
   [ testCase "Map +1 over single Float" $
-      map' (+1) ([0..] :: [Float]) 5 @?= fromList (Z :. 5 :. 5) [2]
+      map' (1+) ([0..] :: [Float]) (Z :. 1) @?= [1]
+  , testCase "Sin [0, PI/6, PI/4, PI/3]" $
+      map' sin sinList (Z :. 4) @?=~ [sqrt 0.0 / 2.0, sqrt 1.0 / 2.0, sqrt 2.0 / 2.0, sqrt 3.0 / 2.0]
+  , testCase "Sin [[0, PI/6], [PI/4, PI/3]]" $
+      map' sin sinList (Z :. 2 :. 2) @?=~ [sqrt 0.0 / 2.0, sqrt 1.0 / 2.0, sqrt 2.0 / 2.0, sqrt 3.0 / 2.0]
   ]
   where
-    map' f xs len =
+    sinList :: [Float]
+    sinList = 0 : ((pi /) <$> [6, 4, 3, 2])
+
+    map' f xs' shape =
       let
-        shape = Z :. len :. len
-        xs' = fromList shape xs
-        reprData = [xs' :-> Result shape]
+        xs = fromList shape xs'
+        reprData = [xs :-> Result shape]
         model = TPU.compile (A.map f) reprData
-      in TPU.execute model xs'
+      in toList $ TPU.execute model xs
 
 zipWithTests :: TestTree
 zipWithTests = testGroup "ZipWith Tests"
