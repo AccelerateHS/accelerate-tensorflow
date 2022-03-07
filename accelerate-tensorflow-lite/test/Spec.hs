@@ -39,10 +39,10 @@ mapTests = testGroup "Map Tests"
     map' f xs len =
       let
         shape = Z :. len :. len
-        inShape = shapeToList shape
-        outShape = shapeToList shape
         xs' = fromList shape xs
-      in TPU.runN (A.map (+1)) [inShape] [outShape] xs'
+        reprData = [xs' :-> Result shape]
+        model = TPU.compile (A.map (+1)) reprData
+      in TPU.execute model xs'
 
 zipWithTests :: TestTree
 zipWithTests = testGroup "ZipWith Tests"
@@ -50,30 +50,31 @@ zipWithTests = testGroup "ZipWith Tests"
       zipWith' (+) zeroList [0..] (Z :. 1) @?=~ [0]
   , testCase "ZipWith (+) [0] [1] " $
       zipWith' (+) zeroList [1..] (Z :. 1) @?=~ [1]
-  , testCase "ZipWith (+) [0,0] [1,2] " $
-      zipWith' (+) zeroList [1..] (Z :. 2) @?=~ [1, 2]
-  , testCase "ZipWith (+) [1,2] [0,0] " $
-      zipWith' (+) [1..] zeroList (Z :. 2) @?=~ [1, 2]
-  , testCase "ZipWith (+) [0,0..] [1,2..100]" $
-      zipWith' (+) zeroList [1..] (Z :. 100) @?=~ [1, 2..100]
-  , testCase "ZipWith (+) [[0]] [[1]]" $
-      zipWith' (+) zeroList [1..] (Z :. 1 :. 1) @?=~ [1]
+  , testCase "ZipWith (+) [1,1] [1,2] " $
+      zipWith' (+) oneList  [1..] (Z :. 2) @?=~ [2, 3]
+  , testCase "ZipWith (+) [1,2] [1,1] " $
+      zipWith' (+) [1..] oneList (Z :. 2) @?=~ [2, 3]
+  , testCase "ZipWith (+) [1,1..] [1,2..100]" $
+      zipWith' (+) oneList [1..] (Z :. 100) @?=~ [2, 3..101]
+  , testCase "ZipWith (+) [[1]] [[1]]" $
+      zipWith' (+) oneList [1..] (Z :. 1 :. 1) @?=~ [2]
   , testCase "ZipWith (*) [0] [1]" $
       zipWith' (*) zeroList [1..] (Z :. 1) @?=~ [0]
-  , testCase "ZipWith (*) [0, 0, 0] [1, 2, 3]" $
-      zipWith' (*) zeroList [1..] (Z :. 3) @?=~ [0, 0, 0]
+  , testCase "ZipWith (*) [1, 1, 1] [1, 2, 3]" $
+      zipWith' (*) oneList [1..] (Z :. 3) @?=~ [1, 2, 3]
   ]
   where
-    zeroList :: [Float]
+    zeroList, oneList :: [Float]
     zeroList = [0, 0..]
+    oneList  = [1, 1..]
 
     zipWith' f xs' ys' shape =
       let
-        inShapes = shapeToList <$> [shape, shape]
-        outShape = shapeToList <$> [shape]
         xs = fromList shape xs'
         ys = fromList shape ys'
-      in toList $ TPU.runN (A.zipWith f) inShapes outShape xs ys
+        reprData = [xs :-> ys :-> Result shape]
+        model = TPU.compile (A.zipWith f) reprData
+      in toList $ TPU.execute model xs ys
 
 foldTests :: TestTree
 foldTests = testGroup "Fold Tests"
@@ -97,12 +98,13 @@ foldTests = testGroup "Fold Tests"
     fold' :: Shape sh => (Exp Float -> Exp Float -> Exp Float) -> [Float] -> (sh :. Int) -> [Float]
     fold' f xs' shape =
       let
-        inShapes = shapeToList <$> [shape]
-        outShape = shapeToList <$> [stripShape shape]
         stripShape :: (sh :. Int) -> sh
         stripShape (x :. _) = x
+
         xs = fromList shape xs'
-      in toList $ TPU.runN (A.fold f 0) inShapes outShape xs
+        reprData = [xs :-> Result $ stripShape shape]
+        model = TPU.compile (A.fold f 0) reprData
+      in toList $ TPU.execute model xs
 
 -- The TPU has _much_ lower precision than an actual float! As such, we need
 -- something better to be able to assert the correctness of the TPU results

@@ -87,6 +87,7 @@ test-suite operation-unit-tests
     , accelerate-tensorflow-lite
     , base >=4.7 && <5
     , bytestring
+    , cereal
     , deepseq
     , directory
     , filepath
@@ -101,6 +102,8 @@ test-suite operation-unit-tests
     , tasty-hunit
     , tasty-rerun
     , tensorflow
+    , tensorflow-core-ops
+    , tensorflow-ops
     , tensorflow-proto
     , text
     , vector
