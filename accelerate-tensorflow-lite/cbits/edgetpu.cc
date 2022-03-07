@@ -110,17 +110,17 @@ edgetpu_run
         // Assumes that the size of the output tensor data is known statically,
         // but this is already required for tflite
         switch ((TensorType) tensor_type[j]) {
-          case TypeInt8:   memcpy(tensor_data[j], interpreter->typed_input_tensor<int8_t>(i),   tensor_size_bytes[j]); break;
-          case TypeInt16:  memcpy(tensor_data[j], interpreter->typed_input_tensor<int16_t>(i),  tensor_size_bytes[j]); break;
-          case TypeInt32:  memcpy(tensor_data[j], interpreter->typed_input_tensor<int32_t>(i),  tensor_size_bytes[j]); break;
-          case TypeInt64:  memcpy(tensor_data[j], interpreter->typed_input_tensor<int64_t>(i),  tensor_size_bytes[j]); break;
-          case TypeWord8:  memcpy(tensor_data[j], interpreter->typed_input_tensor<uint8_t>(i),  tensor_size_bytes[j]); break;
-          case TypeWord16: memcpy(tensor_data[j], interpreter->typed_input_tensor<uint16_t>(i), tensor_size_bytes[j]); break;
-          case TypeWord32: memcpy(tensor_data[j], interpreter->typed_input_tensor<uint32_t>(i), tensor_size_bytes[j]); break;
-          case TypeWord64: memcpy(tensor_data[j], interpreter->typed_input_tensor<uint64_t>(i), tensor_size_bytes[j]); break;
-          case TypeHalf:   memcpy(tensor_data[j], interpreter->typed_input_tensor<uint16_t>(i), tensor_size_bytes[j]); break;
-          case TypeFloat:  memcpy(tensor_data[j], interpreter->typed_input_tensor<float>(i),    tensor_size_bytes[j]); break;
-          case TypeDouble: memcpy(tensor_data[j], interpreter->typed_input_tensor<double>(i),   tensor_size_bytes[j]); break;
+          case TypeInt8:   memcpy(tensor_data[j], interpreter->typed_output_tensor<int8_t>(i),   tensor_size_bytes[j]); break;
+          case TypeInt16:  memcpy(tensor_data[j], interpreter->typed_output_tensor<int16_t>(i),  tensor_size_bytes[j]); break;
+          case TypeInt32:  memcpy(tensor_data[j], interpreter->typed_output_tensor<int32_t>(i),  tensor_size_bytes[j]); break;
+          case TypeInt64:  memcpy(tensor_data[j], interpreter->typed_output_tensor<int64_t>(i),  tensor_size_bytes[j]); break;
+          case TypeWord8:  memcpy(tensor_data[j], interpreter->typed_output_tensor<uint8_t>(i),  tensor_size_bytes[j]); break;
+          case TypeWord16: memcpy(tensor_data[j], interpreter->typed_output_tensor<uint16_t>(i), tensor_size_bytes[j]); break;
+          case TypeWord32: memcpy(tensor_data[j], interpreter->typed_output_tensor<uint32_t>(i), tensor_size_bytes[j]); break;
+          case TypeWord64: memcpy(tensor_data[j], interpreter->typed_output_tensor<uint64_t>(i), tensor_size_bytes[j]); break;
+          case TypeHalf:   memcpy(tensor_data[j], interpreter->typed_output_tensor<uint16_t>(i), tensor_size_bytes[j]); break;
+          case TypeFloat:  memcpy(tensor_data[j], interpreter->typed_output_tensor<float>(i),    tensor_size_bytes[j]); break;
+          case TypeDouble: memcpy(tensor_data[j], interpreter->typed_output_tensor<double>(i),   tensor_size_bytes[j]); break;
         }
         break;
       }
