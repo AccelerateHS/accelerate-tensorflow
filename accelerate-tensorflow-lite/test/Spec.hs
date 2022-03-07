@@ -13,6 +13,7 @@ import Test.Tasty.HUnit
 import Data.Array.Accelerate as A
 import Data.Array.Accelerate.Sugar.Shape
 import Data.Array.Accelerate.TensorFlow.Lite as TPU
+-- import Data.Array.Accelerate.TensorFlow.Lite.Sugar.Shapes as TPUS
 
 main :: IO ()
 main = do
@@ -26,6 +27,7 @@ unitTests = testGroup "Unit tests"
   [ mapTests
   , zipWithTests
   , foldTests
+  , mathTests
   ]
 
 asAccelerateArray xs = fromList (Z :. P.length xs) xs
@@ -41,7 +43,7 @@ mapTests = testGroup "Map Tests"
         shape = Z :. len :. len
         xs' = fromList shape xs
         reprData = [xs' :-> Result shape]
-        model = TPU.compile (A.map (+1)) reprData
+        model = TPU.compile (A.map f) reprData
       in TPU.execute model xs'
 
 zipWithTests :: TestTree
@@ -105,6 +107,55 @@ foldTests = testGroup "Fold Tests"
         reprData = [xs :-> Result $ stripShape shape]
         model = TPU.compile (A.fold f 0) reprData
       in toList $ TPU.execute model xs
+
+mathTests :: TestTree
+mathTests = testGroup "Math Function Tests (using map)"
+  [ testGroup "Sin" $
+      [ testCase "Sin [0]" $
+          map' sin sinList (Z :. 1) @?=~ [0]
+      , testCase "Sin [0, PI/6, PI/4, PI/3, PI/2]" $
+          map' sin sinList (Z :. 5) @?=~ [sqrt 0.0 / 2.0, sqrt 1.0 / 2.0, sqrt 2.0 / 2.0, sqrt 3.0 / 2.0, sqrt 4.0 / 2.0]
+      ]
+  , testGroup "Cos" $
+      [ testCase "Cos [0]" $
+          map' cos sinList (Z :. 1) @?=~ [1]
+      , testCase "Cos [0, PI/6, PI/4, PI/3, PI/2]" $
+          map' cos sinList (Z :. 5) @?=~ [sqrt 4.0 / 2.0, sqrt 3.0 / 2.0, sqrt 2.0 / 2.0, sqrt 1.0 / 2.0, sqrt 0.0 / 2.0]
+      ]
+  , testGroup "Max" $
+      [ testCase "Max [0] [-3]" $
+          zipWith' A.max maxListLeft maxListRight (Z :. 1) @?=~ [0]
+      , testCase "Max [0, -3, 1, -6, 2, -9] [-3, 0, -6, 1, -9, 2]" $
+          zipWith' A.max maxListLeft maxListRight (Z :. 6) @?=~ [0, 0, 1, 1, 2, 2]
+      ]
+  ]
+  where
+    sinList, maxListLeft, maxListRight :: [Float]
+    sinList = 0 : ((pi /) <$> [6, 4, 3, 2])
+    maxListLeft  =      merge [0..] $ (*(-1)) <$> [3, 6..]
+    maxListRight = flip merge [0..] $ (*(-1)) <$> [3, 6..]
+
+    merge :: [a] -> [a] -> [a]
+    merge [] xs = xs
+    merge xs [] = xs
+    merge (x:xs) (y:ys) = x:y:merge xs ys
+
+    map' :: Shape sh => (Exp Float -> Exp Float) -> [Float] -> sh -> [Float]
+    map' f xs' shape =
+      let
+        xs = fromList shape xs'
+        reprData = [xs :-> Result shape]
+        model = TPU.compile (A.map f) reprData
+      in toList $ TPU.execute model xs
+
+    zipWith' :: Shape sh => (Exp Float -> Exp Float -> Exp Float) -> [Float] -> [Float] -> sh -> [Float]
+    zipWith' f xs' ys' shape =
+      let
+        xs = fromList shape xs'
+        ys = fromList shape ys'
+        reprData = [xs :-> ys :-> Result shape]
+        model = TPU.compile (A.zipWith f) reprData
+      in toList $ TPU.execute model xs ys
 
 -- The TPU has _much_ lower precision than an actual float! As such, we need
 -- something better to be able to assert the correctness of the TPU results
