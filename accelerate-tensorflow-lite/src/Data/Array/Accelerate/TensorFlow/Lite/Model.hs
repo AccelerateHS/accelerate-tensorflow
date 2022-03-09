@@ -47,6 +47,8 @@ import Data.Serialize
 import qualified Data.ByteString                                              as B
 
 
+type Error = String
+
 data Model f where
   Model :: AfunctionRepr a f r
         -> ModelAfun r
@@ -67,13 +69,22 @@ modelAfun (AfunctionReprLam lamR) (Tlam lhs f) (Aparam _ _ xs) = Mlam lhs (model
 modelAfun _ _ _ = error "impossible"
 
 
+-- | Serialise a compiled EdgeTPU model to binary format
+--
 encodeModel :: Model f -> ByteString
 encodeModel (Model _ f g) = runPut $ do
   putModelAfun f
   putInt64le (fromIntegral (B.length g))
   putByteString g
 
-decodeModel :: forall f. Afunction f => ByteString -> Either String (Model (AfunctionR f))
+-- | Decode a previously compiled program for EdgeTPU into an executable
+-- model.
+--
+-- The type of the model is encoded in the binary representation, and is
+-- checked during deserialisation. The function will return 'Left' if these
+-- types do not match (or if decoding the buffer fails for another reason).
+--
+decodeModel :: forall f. Afunction f => ByteString -> Either Error (Model (AfunctionR f))
 decodeModel buffer =
   let fR    = afunctionRepr @f
       model = do
@@ -87,6 +98,7 @@ decodeModel buffer =
     Right (Exists f, g)
       | Just Refl <- checkModelAfun fR f -> Right (Model fR f g)
       | otherwise                        -> Left "Couldn't match expected type `TODO' with actual type `TODO'"
+
 
 checkModelAfun :: AfunctionRepr a f r -> ModelAfun s -> Maybe (r :~: s)
 checkModelAfun fR@AfunctionReprBody (Mbody aR _)
@@ -131,6 +143,15 @@ data Exists f where
 data Exists3 f where
   Exists3 :: f a b c -> Exists3 f
 
+
+-- XXX: The encoding here is extremely wasteful, as we are using bytes to
+-- represent each constructor which often only requires one or two bits
+-- each (IntegralType being the only exception, which requires four).
+--
+-- If we would use a more efficient representation such as
+-- <https://hackage.haskell.org/package/flat flat>, and then we would sleep
+-- better at night (even if we wouldn't actually save that much memory
+-- and/or time).
 
 putModelAfun :: ModelAfun f -> Put
 putModelAfun (Mbody aR sh) = putWord8 0 >> putArraysR aR >> putShapes aR sh

@@ -22,8 +22,7 @@ import Data.Array.Accelerate.Sugar.Elt
 import Data.Array.Accelerate.Sugar.Shape
 import Data.Array.Accelerate.Representation.Type
 
-import qualified Data.Array.Accelerate.TensorFlow.Lite.Representation.Shapes as R
-
+import qualified Data.Array.Accelerate.TensorFlow.Lite.Representation.Shapes  as R
 
 
 class Arrays a => HasShapes a where

@@ -18,7 +18,7 @@
 module Data.Array.Accelerate.TensorFlow.Lite (
 
   Smart.Acc, Sugar.Arrays, Afunction, AfunctionR,
-  Model, RepresentativeData, Args(..),
+  Model, RepresentativeData, Shapes, Args(..),
   encodeModel, decodeModel,
 
   compile,
@@ -46,6 +46,7 @@ import Data.Array.Accelerate.TensorFlow.Lite.CodeGen
 import Data.Array.Accelerate.TensorFlow.Lite.Compile
 import Data.Array.Accelerate.TensorFlow.Lite.Model
 import Data.Array.Accelerate.TensorFlow.Lite.Sugar.Args
+import Data.Array.Accelerate.TensorFlow.Lite.Sugar.Shapes
 import qualified Data.Array.Accelerate.TensorFlow.Lite.Representation.Args    as R
 import qualified Data.Array.Accelerate.TensorFlow.Lite.Representation.Shapes  as R
 
@@ -71,7 +72,22 @@ type RepresentativeData f = [Args f]
 
 
 -- | Compile a TensorFlow model for the EdgeTPU. The given representative
--- data is used in the quantisation process.
+-- data is used in the compilation process to specify the dimensions of the
+-- input and output tensors, as well as providing sample data for the
+-- quantisation process.
+--
+-- For example, given a tensor computation:
+--
+-- > f :: (Arrays a, Arrays b, Arrays c) => Acc a -> Acc b -> Acc c
+-- > f = ...
+--
+-- this will produce:
+--
+-- > m :: Model (a -> b -> c)
+-- > m = compile f args
+--
+-- The compiled model can then be evaluated using 'execute' or serialised
+-- using 'encodeModel'.
 --
 compile :: forall f. Afunction f => f -> RepresentativeData (AfunctionR f) -> Model (AfunctionR f)
 compile acc args = unsafePerformIO $ Model afunR (modelAfun afunR tfun x) <$> compileTfunWith tfun (x:xs)
@@ -82,7 +98,27 @@ compile acc args = unsafePerformIO $ Model afunR (modelAfun afunR tfun x) <$> co
     x:xs   = map (fromArgs afunR) args
 
 
--- | Run a previously compiled model
+-- | Prepare and/or run a previously compiled model
+--
+-- For example, given:
+--
+-- > m :: Model (Vector Float -> Vector Float -> Vector Int8)
+-- > m = ...
+--
+-- Then we can partially apply it to create a reusable lambda function:
+--
+-- > go :: Vector Float -> Vector Float -> Vector Int
+-- > go = execute m
+--
+-- And finally run the model on the TPU by supplying the arguments to the
+-- lambda. Of course, this can all be done in a single step as well:
+--
+-- > xs, ys :: Vector Float
+-- > xs = ...
+-- > ys = ...
+-- >
+-- > result :: Vector Word8
+-- > result = execute m xs ys
 --
 execute :: Model f -> f
 execute (Model afunR fun buffer) = eval afunR fun 0 []

@@ -24,6 +24,29 @@ import qualified Data.Array.Accelerate.TensorFlow.Lite.Representation.Args    as
 
 infixr 0 :->
 
+-- | Arguments to feed to a tensor computation. This is used to capture the
+-- representative data for a computation, as well as indicate the sizes of
+-- the input and output tensors, both of which are required for compilation
+-- to the EdgeTPU hardware.
+--
+-- For example, given a tensor computation:
+--
+-- > f :: (Arrays a, Arrays b, Arrays c) => Acc a -> Acc b -> Acc c
+-- > f = ...
+--
+-- The arguments that will be passed to that function can be collected into
+-- this data type as:
+--
+-- > args :: (Arrays a, Arrays b, Arrays c) => a -> b -> Shapes c -> Args (a -> b -> c)
+-- > args a b c = a :-> b :-> Result c
+--
+-- Note that @a@ and @b@ here are "real" arrays, not embedded Accelerate
+-- ('Data.Array.Accelerate.Acc') arrays. For the output type @c@ we only
+-- need the extents ('Shapes') of each of the output arrays. For example:
+--
+-- > Shapes (Array DIM1 Float) = DIM1
+-- > Shapes (Array DIM1 Int8, Array DIM2 Float) = (DIM1, DIM2)
+--
 data Args f where
   (:->)  :: Arrays a => a -> Args b -> Args (a -> b)
   Result :: HasShapes a => Shapes a -> Args a
