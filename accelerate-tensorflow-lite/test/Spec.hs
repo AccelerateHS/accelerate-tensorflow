@@ -28,6 +28,8 @@ unitTests = testGroup "Unit tests"
   , zipWithTests
   , foldTests
   , mathTests
+  , generateTests
+  -- , dotpTests
   ]
 
 asAccelerateArray xs = fromList (Z :. P.length xs) xs
@@ -51,6 +53,53 @@ mapTests = testGroup "Map Tests"
         reprData = [xs :-> Result shape]
         model = TPU.compile (A.map f) reprData
       in toList $ TPU.execute model xs
+
+generateTests :: TestTree
+generateTests = testGroup "Generate Tests"
+  [ testCase "generate (I1 1) (const 1.0)" $
+      generate' (Z :. 1)  (I1 1)  (const 1.0) @?=~ [1.0]
+  , testCase "generate (I1 10) (const 1.0)" $
+      generate' (Z :. 10) (I1 10) (const 1.0) @?=~ [1.0 .. 10.0]
+  , testCase "generate (I1 10) ( \\(I1 n) -> fromIntegral n)" $
+      generate' (Z :. 10) (I1 10) ( \(I1 n) -> A.fromIntegral n) @?=~ [0.0 .. 9.0]
+  ]
+  where
+    generate' :: Shape sh => sh -> Exp sh -> (Exp sh -> Exp Float) -> [Float]
+    generate' sh esh f =
+      let
+        xs = A.generate esh f
+        reprData = [Result sh]
+        model = TPU.compile xs reprData
+      in toList $ TPU.execute model
+
+dotpTests :: TestTree
+dotpTests = testGroup "Dot Product Tests"
+  [ testCase "dot [0] [1]" $
+      dotTest 1
+  , testCase "dot [0, 1] [1, 3]" $
+      dotTest 2
+  , testCase "dot [0, 1, 2] [1, 3, 5]" $
+      dotTest 3
+  , testCase "dot [0, 1, 2, 3] [1, 3, 5, 7]" $
+      dotTest 4
+  , testCase "dot [0, 1, 2, 3, 4] [1, 3, 5, 7, 9]" $
+      dotTest 5
+  , testCase "dot [0, 1, 2, 3, 4, 5, 6] [1, 3, 5, 7, 9, 11, 13]" $
+      dotTest 7
+  ]
+  where
+    zeroList, oneList :: [Float]
+    zeroList = [0..]
+    oneList  = [1, 3..]
+
+    dot xs' ys' shape@(s :. _) =
+      let
+        xs = fromList shape ys'
+        ys = fromList shape ys'
+        reprData = [xs :-> ys :-> Result s]
+        model = TPU.compile (\as bs -> A.fold (+) 0 $ A.zipWith (*) as bs) reprData
+      in toList $ TPU.execute model xs ys
+    dotTest n = dot zeroList oneList (Z :. n) @?=~ [P.foldr (+) 0 (P.zipWith (*) (P.take n zeroList) oneList)]
 
 zipWithTests :: TestTree
 zipWithTests = testGroup "ZipWith Tests"
