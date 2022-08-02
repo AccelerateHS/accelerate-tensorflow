@@ -28,7 +28,8 @@ unitTests = testGroup "Unit tests"
   , zipWithTests
   , foldTests
   , mathTests
-  , dotpTests
+  , generateTests
+  -- , dotpTests
   ]
 
 asAccelerateArray xs = fromList (Z :. P.length xs) xs
@@ -52,6 +53,24 @@ mapTests = testGroup "Map Tests"
         reprData = [xs :-> Result shape]
         model = TPU.compile (A.map f) reprData
       in toList $ TPU.execute model xs
+
+generateTests :: TestTree
+generateTests = testGroup "Generate Tests"
+  [ testCase "generate (I1 1) (const 1.0)" $
+      generate' (Z :. 1)  (I1 1)  (const 1.0) @?=~ [1.0]
+  , testCase "generate (I1 10) (const 1.0)" $
+      generate' (Z :. 10) (I1 10) (const 1.0) @?=~ [1.0 .. 10.0]
+  , testCase "generate (I1 10) ( \\(I1 n) -> fromIntegral n)" $
+      generate' (Z :. 10) (I1 10) ( \(I1 n) -> A.fromIntegral n) @?=~ [0.0 .. 9.0]
+  ]
+  where
+    generate' :: Shape sh => sh -> Exp sh -> (Exp sh -> Exp Float) -> [Float]
+    generate' sh esh f =
+      let
+        xs = A.generate esh f
+        reprData = [Result sh]
+        model = TPU.compile xs reprData
+      in toList $ TPU.execute model
 
 dotpTests :: TestTree
 dotpTests = testGroup "Dot Product Tests"

@@ -76,7 +76,7 @@ library:
       clog
 
 tests:
-  operation-unit-tests:
+  operation-unit-tests-tfl:
     main: Spec.hs
     source-dirs: test
     ghc-options:
