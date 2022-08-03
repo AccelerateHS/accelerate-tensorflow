@@ -134,19 +134,29 @@ zipWithTests = testGroup "ZipWith Tests"
       in toList $ TPU.execute model xs ys
 
 foldTests :: TestTree
-foldTests = testGroup "Fold Tests"
-  [ testCase "Fold (+) [0]" $
-      fold' (+) ascList (Z :. 1) @?=~ [0]
-  , testCase "Fold (+) [0, 1, 2, 3, 4, 5]" $
-      fold' (+) ascList (Z :. 6) @?=~ [15]
-  , testCase "Fold (*) [0]" $
-      fold' (*) ascList (Z :. 1) @?=~ [0]
-  , testCase "Fold (*) [0, 1, 2, 3, 4, 5]" $
-      fold' (*) ascList (Z :. 6) @?=~ [0]
-  , testCase "Fold (+) [[0]]" $
-      fold' (+) ascList (Z :. 1 :. 1) @?=~ [0]
-  , testCase "Fold (+) [[0, 1, 2], [3, 4, 5]]" $
-      fold' (+) ascList (Z :. 2 :. 3) @?=~ [3, 12]
+foldTests = testGroup "Fold-like Tests"
+  [ testGroup "Fold Tests"
+    [ testCase "Fold (+) [0]" $
+        fold' (+) ascList (Z :. 1) @?=~ [0]
+    , testCase "Fold (+) [0, 1, 2, 3, 4, 5]" $
+        fold' (+) ascList (Z :. 6) @?=~ [15]
+    , testCase "Fold (*) [0]" $
+        fold' (*) ascList (Z :. 1) @?=~ [0]
+    , testCase "Fold (*) [0, 1, 2, 3, 4, 5]" $
+        fold' (*) ascList (Z :. 6) @?=~ [0]
+    , testCase "Fold (+) [[0]]" $
+        fold' (+) ascList (Z :. 1 :. 1) @?=~ [0]
+    , testCase "Fold (+) [[0, 1, 2], [3, 4, 5]]" $
+        fold' (+) ascList (Z :. 2 :. 3) @?=~ [3, 12]
+    ]
+  , testGroup "Sum Tests"
+    [ testCase "Sum [0]" $
+        sum' ascList (Z :. 1) @?=~ [0]
+    , testCase "Sum [0..5]" $
+        sum' ascList (Z :. 6) @?=~ [15]
+    , testCase "Sum [[0..2], [3..5]]" $
+        sum' ascList (Z :. 2 :. 3) @?=~ [3, 12]
+    ]
   ]
   where
     ascList :: [Float]
@@ -161,6 +171,17 @@ foldTests = testGroup "Fold Tests"
         xs = fromList shape xs'
         reprData = [xs :-> Result $ stripShape shape]
         model = TPU.compile (A.fold f 0) reprData
+      in toList $ TPU.execute model xs
+
+    sum' :: Shape sh => [Float] -> (sh :. Int) -> [Float]
+    sum' xs' shape =
+      let
+        stripShape :: (sh :. Int) -> sh
+        stripShape (x :. _) = x
+
+        xs = fromList shape xs'
+        reprData = [xs :-> Result $ stripShape shape]
+        model = TPU.compile A.sum reprData
       in toList $ TPU.execute model xs
 
 mathTests :: TestTree
