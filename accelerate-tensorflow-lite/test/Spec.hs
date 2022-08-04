@@ -163,6 +163,17 @@ foldTests = testGroup "Fold Tests"
         model = TPU.compile (A.fold f 0) reprData
       in toList $ TPU.execute model xs
 
+    sum' :: Shape sh => [Float] -> (sh :. Int) -> [Float]
+    sum' xs' shape =
+      let
+        stripShape :: (sh :. Int) -> sh
+        stripShape (x :. _) = x
+
+        xs = fromList shape xs'
+        reprData = [xs :-> Result $ stripShape shape]
+        model = TPU.compile A.sum reprData
+      in toList $ TPU.execute model xs
+
 mathTests :: TestTree
 mathTests = testGroup "Math Function Tests (using map)"
   [ testGroup "Sin" $
