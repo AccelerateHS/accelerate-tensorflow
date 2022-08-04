@@ -29,6 +29,7 @@ unitTests = testGroup "Unit tests"
   , foldTests
   , mathTests
   , generateTests
+  , transposeTests
   -- , dotpTests
   ]
 
@@ -71,6 +72,46 @@ generateTests = testGroup "Generate Tests"
         reprData = [Result sh]
         model = TPU.compile xs reprData
       in toList $ TPU.execute model
+
+transposeTests :: TestTree
+transposeTests = testGroup "Transpose Tests"
+  [ testCase "transpose [[1]]" $
+      --transpose' (Z :. 1 :. 1) (A.fromList [1.0, 1.0..]) `areEqual` [[1.0]]
+      transpose' (Z :. 1 :. 1) [1.0, 1.0..] @?=~ [1.0]
+  ]
+  where
+    transpose' :: DIM2 -> [Float] -> [Float]
+    transpose' sh xs' =
+      let
+        xs = fromList sh xs'
+        reprData = [xs :-> Result sh]
+        model = TPU.compile A.transpose reprData
+      in toList $ TPU.execute model xs
+
+    areEqual :: [[Float]] -> [[Float]] -> Assertion
+    areEqual xss yss =
+      let
+        -- Check if the outer lists have the same shape and if all inner lists
+        -- have the same shape as well.
+        xsl = P.map P.length xss
+        ysl = P.map P.length yss
+
+        -- Check if each element of the inner lists are equal to the element in
+        -- the same position in the other list
+        eqs = P.zipWith (@?=~) xss yss
+
+        -- Make sure that all elements are equal to each other
+        eq  = sequence_ eqs
+
+        -- Make a nice message so the user knows what the issue is...
+        listLenMsg =
+            "The list we found does not have the correct lengths:\nFound lengths: "
+         P.++ show xsl
+         P.++ "\nExpected lengths: "
+         P.++ show ysl
+      in do
+        unless (xsl P.== ysl) (assertFailure listLenMsg)
+        eq
 
 dotpTests :: TestTree
 dotpTests = testGroup "Dot Product Tests"
