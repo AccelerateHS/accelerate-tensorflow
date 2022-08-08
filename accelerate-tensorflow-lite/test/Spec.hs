@@ -78,6 +78,14 @@ transposeTests = testGroup "Transpose Tests"
   [ testCase "transpose [[1]]" $
       --transpose' (Z :. 1 :. 1) (A.fromList [1.0, 1.0..]) `areEqual` [[1.0]]
       transpose' (Z :. 1 :. 1) [1.0, 1.0..] @?=~ [1.0]
+  , testCase "transpose [[1, 1], [1, 1]]" $
+      transpose' (Z :. 2 :. 2) [1.0, 1.0..] @?=~ [1.0, 1.0, 1.0, 1.0]
+  , testCase "transpose [[1, 2]]" $
+      transpose' (Z :. 1 :. 2) [1.0, 2.0]   @?=~ [1.0, 2.0]
+  , testCase "transpose [[1], [2]]" $
+      transpose' (Z :. 2 :. 1) [1.0, 2.0]   @?=~ [1.0, 2.0]
+  , testCase "transpose [[1, 2, 3], [4, 5, 6]]" $
+      transpose' (Z :. 2 :. 3) [1.0, 2.0..] @?=~ [1.0, 4.0, 2.0, 5.0, 3.0, 6.0]
   ]
   where
     transpose' :: DIM2 -> [Float] -> [Float]
