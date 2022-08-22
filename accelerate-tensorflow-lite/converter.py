@@ -26,10 +26,10 @@ def parse_representative_data_file(file_path):
         # Parse the number of representative datasets
         dataset_count = read_word8(f)
 
-        # Parse the number of input tensors per representative dataset
-        tensor_count = read_word8(f)
-
         for _ in range(dataset_count):
+            # Parse the number of input tensors per representative dataset
+            tensor_count = read_word8(f)
+
             tensors = []
             for _ in range(tensor_count):
                 tensors.extend(read_array(f))
@@ -70,6 +70,7 @@ def read_datatype(f):
         10: (8, "d", np.float64),   # Type.Float64
     }
     t = read_word8(f)
+    # print(t)
     return switch.get(t)
 
 
