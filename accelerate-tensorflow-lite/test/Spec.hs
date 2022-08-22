@@ -30,6 +30,7 @@ unitTests = testGroup "Unit tests"
   , mathTests
   , generateTests
   , transposeTests
+  , uncurryTests
   -- , dotpTests
   ]
 
@@ -130,6 +131,31 @@ transposeTests = testGroup "Transpose Tests"
       in do
         unless (xsl P.== ysl) (assertFailure listLenMsg)
         eq
+
+uncurryTests :: TestTree
+uncurryTests = testGroup "Uncurry Tests"
+  [ testCase "uncurry curriedDot [0] [1]" $
+      uncurry' (\as bs -> A.fold (+) 0 $ A.zipWith (*) as bs) [0] [1]
+  , testCase "uncurry curriedDot [0, 1] [1, 3]" $
+      uncurry' (\as bs -> A.fold (+) 0 $ A.zipWith (*) as bs) [0, 1] [1, 3]
+  , testCase "uncurry curriedDot [0, 1, 2, 3, 4, 5] [1, 3, 5, 7, 9, 11]" $
+      uncurry' (\as bs -> A.fold (+) 0 $ A.zipWith (*) as bs) [0, 1, 2, 3, 4, 5] [1, 3, 5, 7, 9, 11]
+  ]
+  where
+    uncurry'
+      :: (Acc (Array (Z :. Int) Float) -> Acc (Array (Z :. Int) Float) -> Acc (Array Z Float))
+      -> [Float]
+      -> [Float]
+      -> Assertion
+    uncurry' f as bs =
+      let
+        sh@(s :. _) = Z :. P.length as
+	xs = fromList sh as
+	ys = fromList sh bs
+	tu = use (xs, ys)
+	reprData = [(xs, ys) :-> Result s]
+	model = TPU.compile (A.uncurry f) reprData
+      in toList (TPU.execute model (xs, ys)) @?=~ [P.foldr (+) 0 (P.zipWith (*) as bs)]
 
 dotpTests :: TestTree
 dotpTests = testGroup "Dot Product Tests"
