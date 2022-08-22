@@ -446,20 +446,20 @@ buildOpenAcc aenv (OpenAcc pacc) =
         , ShapeRsnoc (ShapeRsnoc ShapeRz) <- shR
         , ShapeRsnoc (ShapeRsnoc ShapeRz) <- shR'
         , Lam _ (Body b)                  <- p
-	, Let lhs bnd bod                 <- b
-	, LeftHandSidePair l r            <- lhs
-	, Pair x y                        <- bod
-	, Let xlhs xbnd xbod              <- x
-	, LeftHandSidePair xl xr          <- xlhs
-	, Pair bl br                      <- xbod
-	, Nil                             <- bl
-	, Evar (Var _ (SuccIdx ZeroIdx))  <- br
-	, Evar (Var _ ZeroIdx)            <- y
+        , Let lhs bnd bod                 <- b
+        , LeftHandSidePair l r            <- lhs
+        , Pair x y                        <- bod
+        , Let xlhs xbnd xbod              <- x
+        , LeftHandSidePair xl xr          <- xlhs
+        , Pair bl br                      <- xbod
+        , Nil                             <- bl
+        , Evar (Var _ (SuccIdx ZeroIdx))  <- br
+        , Evar (Var _ ZeroIdx)            <- y
         -- TODO: check the result shape?
-	-- TODO: check the following variables?
-	--         - l, xl
-	--         - r, xr
-	--         - bnd, xbd
+        -- TODO: check the following variables?
+        --         - l, xl
+        --         - r, xr
+        --         - bnd, xbd
         = transposeL acc
 
         | otherwise

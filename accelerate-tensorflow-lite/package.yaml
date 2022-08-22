@@ -53,8 +53,9 @@ library:
     - Data.Array.Accelerate.TensorFlow.Lite
 
   ghc-options:
-    - -Wall
     - -O2
+    - -Wall
+    - -Werror=tabs
 
   cc-options:
     -O3

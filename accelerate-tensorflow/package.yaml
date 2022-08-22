@@ -37,7 +37,8 @@ dependencies:
 library:
   source-dirs: src
   ghc-options:
-    - -Wall
     - -O2
+    - -Wall
+    - -Werror=tabs
 
 # vim: nospell

@@ -44,7 +44,7 @@ library
       Paths_accelerate_tensorflow_lite
   hs-source-dirs:
       src
-  ghc-options: -Wall -O2
+  ghc-options: -O2 -Wall -Werror=tabs
   cc-options: -O3 -Wall -march=native
   cxx-sources:
       cbits/edgetpu.cc

@@ -39,7 +39,7 @@ library
       Paths_accelerate_tensorflow
   hs-source-dirs:
       src
-  ghc-options: -Wall -O2
+  ghc-options: -O2 -Wall -Werror=tabs
   build-depends:
       accelerate ==1.3.*
     , base >=4.7 && <5
