@@ -4,7 +4,7 @@ github:             "tmcdonell/accelerate-tensorflow"
 license:            BSD3
 author:             "Trevor L. McDonell"
 maintainer:         "Trevor L. McDonell <trevor.mcdonell@gmail.com>"
-copyright:          "2021 The Accelerate Team"
+copyright:          "[2021..2022] The Accelerate Team"
 
 extra-source-files:
 - ../README.md
@@ -27,23 +27,6 @@ dependencies:
 - base                          >= 4.7 && < 5
 - accelerate                    == 1.3.*
 - accelerate-tensorflow
-- bytestring
-- cereal
-- deepseq
-- directory
-- filepath
-- formatting
-- lens-family
-- mtl
-- process
-- proto-lens
-- random
-- tensorflow
-- tensorflow-core-ops
-- tensorflow-ops
-- tensorflow-proto
-- text
-- vector
 
 library:
   source-dirs: src
@@ -51,6 +34,25 @@ library:
 
   exposed-modules:
     - Data.Array.Accelerate.TensorFlow.Lite
+
+  dependencies:
+    - bytestring
+    - cereal
+    - deepseq
+    - directory
+    - filepath
+    - formatting
+    - lens-family
+    - mtl
+    - process
+    - proto-lens
+    - random
+    - tensorflow
+    - tensorflow-core-ops
+    - tensorflow-ops
+    - tensorflow-proto
+    - text
+    - vector
 
   ghc-options:
     - -O2
@@ -77,18 +79,20 @@ library:
       clog
 
 tests:
-  operation-unit-tests-tfl:
-    main: Spec.hs
-    source-dirs: test
+  nofib-tensorflow-lite:
+    main: Main.hs
+    source-dirs: test/nofib
+
     ghc-options:
       - -Wall
       - -O2
+      - -Werror=tabs
+
     dependencies:
-      - accelerate-tensorflow
       - accelerate-tensorflow-lite
+      - hedgehog
       - tasty
       - tasty-hedgehog
       - tasty-hunit
-      - tasty-rerun
 
 # vim: nospell

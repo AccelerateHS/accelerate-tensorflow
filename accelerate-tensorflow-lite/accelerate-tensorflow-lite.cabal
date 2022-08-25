@@ -13,7 +13,7 @@ homepage:       https://github.com/tmcdonell/accelerate-tensorflow#readme
 bug-reports:    https://github.com/tmcdonell/accelerate-tensorflow/issues
 author:         Trevor L. McDonell
 maintainer:     Trevor L. McDonell <trevor.mcdonell@gmail.com>
-copyright:      2021 The Accelerate Team
+copyright:      [2021..2022] The Accelerate Team
 license:        BSD-3-Clause
 build-type:     Simple
 extra-source-files:
@@ -73,38 +73,32 @@ library
     , vector
   default-language: Haskell2010
 
-test-suite operation-unit-tests-tfl
+test-suite nofib-tensorflow-lite
   type: exitcode-stdio-1.0
-  main-is: Spec.hs
+  main-is: Main.hs
   other-modules:
+      Data.Array.Accelerate.Test.NoFib.Base
+      Data.Array.Accelerate.Test.NoFib.Imaginary
+      Data.Array.Accelerate.Test.NoFib.Imaginary.DotP
+      Data.Array.Accelerate.Test.NoFib.Imaginary.SASUM
+      Data.Array.Accelerate.Test.NoFib.Imaginary.SAXPY
+      Data.Array.Accelerate.Test.NoFib.Prelude
+      Data.Array.Accelerate.Test.NoFib.Prelude.Backpermute
+      Data.Array.Accelerate.Test.NoFib.Prelude.Fold
+      Data.Array.Accelerate.Test.NoFib.Prelude.Generate
+      Data.Array.Accelerate.Test.NoFib.Prelude.Map
+      Data.Array.Accelerate.Test.NoFib.Prelude.ZipWith
       Paths_accelerate_tensorflow_lite
   hs-source-dirs:
-      test
-  ghc-options: -Wall -O2
+      test/nofib
+  ghc-options: -Wall -O2 -Werror=tabs
   build-depends:
       accelerate ==1.3.*
     , accelerate-tensorflow
     , accelerate-tensorflow-lite
     , base >=4.7 && <5
-    , bytestring
-    , cereal
-    , deepseq
-    , directory
-    , filepath
-    , formatting
-    , lens-family
-    , mtl
-    , process
-    , proto-lens
-    , random
+    , hedgehog
     , tasty
     , tasty-hedgehog
     , tasty-hunit
-    , tasty-rerun
-    , tensorflow
-    , tensorflow-core-ops
-    , tensorflow-ops
-    , tensorflow-proto
-    , text
-    , vector
   default-language: Haskell2010

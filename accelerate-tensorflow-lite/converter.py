@@ -39,7 +39,6 @@ def parse_representative_data_file(file_path):
     #end (I hate python's indentation rules...)
 
 
-
 def read_word8(f):
     b = bytearray(1)
     f.readinto(b)
@@ -70,7 +69,6 @@ def read_datatype(f):
         10: (8, "d", np.float64),   # Type.Float64
     }
     t = read_word8(f)
-    # print(t)
     return switch.get(t)
 
 
@@ -119,11 +117,11 @@ def read_array(f):
 #    1. sanitize the data in in_arrs and out_arrs before setting their values.
 #
 def parse_args(args):
-    graph_def = None
-    outfile   = None
-    data_file = None
-    in_arrs   = None
-    out_arrs  = None
+    graph_def = ""
+    outfile   = ""
+    data_file = ""
+    in_arrs   = ""
+    out_arrs  = ""
 
     for arg in args:
         if arg.startswith('--graph_def_file='):

@@ -37,6 +37,7 @@ import Lens.Family2
 import qualified TensorFlow.Build                                   as TF
 import qualified TensorFlow.Core                                    as TF
 import qualified TensorFlow.GenOps.Core                             as TF
+import qualified TensorFlow.Ops                                     as TF hiding ( placeholder' )
 
 import Control.Monad.State
 import Text.Printf
@@ -54,18 +55,12 @@ buildOpenAfunWith aenv (Alam lhs f) (Aparam xR x xs)
         go LeftHandSideWildcard{}                      _             env = return env
         go (LeftHandSidePair aR bR)                    (a, b)        env = go bR b =<< go aR a env
         go (LeftHandSideSingle arrR@(ArrayR _shR _eR)) (Array _sh _) env = state $ \i ->
-          let sh'    = evalState (shape _shR) 0
+          let sh'    = shape _shR _sh
               adata' = evalState (array _eR) 0
 
-              shape :: ShapeR sh -> State Int (TensorShape sh)
-              shape ShapeRz          = return ()
-              shape (ShapeRsnoc shR) = do
-                sz <- state $ \j -> let opName  = TF.opName .~ TF.explicitName (T.pack (printf "input%d_shape%d" i j))
-                                        opShape = TF.opAttr "shape" .~ TF.Shape (map fromIntegral (shapeToList _shR _sh))
-                                    in
-                                    (TF.placeholder' (opShape . opName), j+1)
-                sh <- shape shR
-                return (sh, sz)
+              shape :: ShapeR sh -> sh -> TensorShape sh
+              shape ShapeRz         ()     = ()
+              shape (ShapeRsnoc tR) (t, h) = (shape tR t, TF.constant (TF.Shape [1]) [fromIntegral h])
 
               array :: TypeR t -> State Int (TensorArrayData t)
               array TupRunit         = return ()
@@ -103,9 +98,9 @@ buildOpenAfunWith aenv (Alam lhs f) (Aparam xR x xs)
                   placeholder :: TF.TensorType t => State Int (TF.Tensor TF.Build t)
                   placeholder = state $ \j ->
                     let opName  = TF.opName .~ TF.explicitName (T.pack (printf "input%d_adata%d" i j))
-                        opShape = TF.opAttr "shape" .~ TF.Shape (map fromIntegral (shapeToList _shR _sh))
+                        opShape = TF.opAttr "shape" .~ tensorShape _shR _sh
                     in
-                    (TF.placeholder' (opShape . opName), j+1)
+                    (TF.placeholder' (opName . opShape), j+1)
           in
           (env `Apush` Tensor arrR sh' adata', i+1)
   in do
@@ -116,17 +111,17 @@ buildOpenAfunWith aenv (Alam lhs f) (Aparam xR x xs)
 buildOpenAfunWith aenv (Abody f) (Aresult _ rsh)
   = let
         go :: ArraysR t -> Shapes t -> Tensors t -> State Int (Tensors t)
-        go TupRunit              ()         ()                                  = return ()
-        go (TupRpair aR bR)      (sha, shb) (a, b)                              = (,) <$> go aR sha a <*> go bR shb b
-        go (TupRsingle ArrayR{}) sh         (Tensor (ArrayR shR eR) _sh _adata) = state $ \i ->
+        go TupRunit              ()         ()                                    = return ()
+        go (TupRpair aR bR)      (sha, shb) (a, b)                                = (,) <$> go aR sha a <*> go bR shb b
+        go (TupRsingle ArrayR{}) sh         (Tensor (ArrayR _shR _eR) _sh _adata) = state $ \i ->
           let
-              sh'    = evalState (shape shR _sh) 0
-              adata' = evalState (array eR _adata) 0
+              sh'    = evalState (shape _shR _sh) 0
+              adata' = evalState (array _eR _adata) 0
 
               shape :: ShapeR sh -> TensorShape sh -> State Int (TensorShape sh)
               shape ShapeRz         ()     = return ()
               shape (ShapeRsnoc tR) (t, h) = do
-                h' <- state $ \j -> let opName  = TF.opName .~ TF.explicitName (T.pack (printf "input%d_shape%d" i j))
+                h' <- state $ \j -> let opName  = TF.opName .~ TF.explicitName (T.pack (printf "output%d_shape%d" i j))
                                         opShape = TF.opAttr "shape" .~ TF.Shape [1]
                                     in
                                     (TF.identity' (opShape . opName) h, j+1)
@@ -169,11 +164,11 @@ buildOpenAfunWith aenv (Abody f) (Aresult _ rsh)
               label :: TF.TensorType t => TF.Tensor TF.Build t -> State Int (TF.Tensor TF.Build t)
               label t = state $ \j ->
                 let opName  = TF.opName .~ TF.explicitName (T.pack (printf "output%d_adata%d" i j))
-                    opShape = TF.opAttr "shape" .~ TF.Shape (map fromIntegral (shapeToList shR sh))
+                    opShape = TF.opAttr "shape" .~ tensorShape _shR sh
                 in
                 (TF.identity' (opShape . opName) t, j+1)
           in
-          (Tensor (ArrayR shR eR) sh' adata', i+1)
+          (Tensor (ArrayR _shR _eR) sh' adata', i+1)
 
         f' = evalState (go (arraysR f) rsh (buildOpenAcc aenv f)) 0
   in
@@ -181,4 +176,11 @@ buildOpenAfunWith aenv (Abody f) (Aresult _ rsh)
 --
 buildOpenAfunWith _ _ _ =
   error "impossible"
+
+tensorShape
+    :: ShapeR sh
+    -> sh
+    -> TF.Shape
+tensorShape ShapeRz () = TF.Shape [1]
+tensorShape shR     sh = TF.Shape [ fromIntegral x | x <- reverse (shapeToList shR sh) ]
 

@@ -168,13 +168,13 @@ shapeToTensor
     => ShapeR sh
     -> TensorShape sh
     -> TF.Tensor TF.Build s
-shapeToTensor ShapeRz              ()       = TF.scalar 1
+shapeToTensor ShapeRz              ()       = TF.constant (TF.Shape [1]) [1]
 shapeToTensor (ShapeRsnoc ShapeRz) ((), sh) = sh
 shapeToTensor shR                  sh       =
   let
       go :: (s ~ ScalarTensorDataR Int) => ShapeR sh -> TensorShape sh -> [TF.Tensor TF.Build s] -> [TF.Tensor TF.Build s]
       go ShapeRz         ()     acc = acc
-      go (ShapeRsnoc tR) (t, h) acc = go tR t $ TF.reshape h (TF.scalar (1 :: Int32)) : acc
+      go (ShapeRsnoc tR) (t, h) acc = go tR t (h : acc)
   in
   TF.concat (TF.scalar 0) (go shR sh [])
 

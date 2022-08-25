@@ -13,7 +13,7 @@ homepage:       https://github.com/tmcdonell/accelerate-tensorflow#readme
 bug-reports:    https://github.com/tmcdonell/accelerate-tensorflow/issues
 author:         Trevor L. McDonell
 maintainer:     Trevor L. McDonell <trevor.mcdonell@gmail.com>
-copyright:      2021 The Accelerate Team
+copyright:      [2021..2022] The Accelerate Team
 license:        BSD3
 build-type:     Simple
 extra-source-files:
@@ -54,4 +54,18 @@ library
     , tensorflow-proto
     , text
     , vector
+  default-language: Haskell2010
+
+test-suite nofib-tensorflow
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      Paths_accelerate_tensorflow
+  hs-source-dirs:
+      test/nofib
+  ghc-options: -O2 -Wall -Werror=tabs
+  build-depends:
+      accelerate ==1.3.*
+    , accelerate-tensorflow
+    , base >=4.7 && <5
   default-language: Haskell2010

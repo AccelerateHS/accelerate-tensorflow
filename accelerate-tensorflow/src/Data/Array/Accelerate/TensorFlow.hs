@@ -31,7 +31,8 @@ import Data.Array.Accelerate.Array.Data
 import Data.Array.Accelerate.Array.Unique
 import Data.Array.Accelerate.Lifetime
 import Data.Array.Accelerate.Representation.Type
-import Data.Array.Accelerate.Sugar.Array
+import Data.Array.Accelerate.Representation.Shape
+import Data.Array.Accelerate.Sugar.Array                            ( Arrays(..), ArraysR(..) )
 import Data.Array.Accelerate.Trafo.Sharing
 import Data.Array.Accelerate.Trafo.Simplify
 import Data.Array.Accelerate.Type
@@ -92,14 +93,23 @@ runN acc =
       eval (AfunctionReprLam lamR) (Tlam lhs f) skip aenv = \arr ->
         let
             go :: ALeftHandSide t aenv aenv' -> t -> [TF.Feed] -> State Int [TF.Feed]
-            go LeftHandSideWildcard{}                 _                  env = return env
-            go (LeftHandSidePair aR bR)               (a, b)             env = go bR b =<< go aR a env
-            go (LeftHandSideSingle (R.ArrayR shR eR)) (R.Array sh adata) env = state $ \i ->
-              let dims   = [ fromIntegral x :: Int64 | x <- R.shapeToList shR sh ]
-                  sh'    = TF.feed (TF.tensorValueFromName (T.pack (printf "input%d_shape" i)))
-                         $ TF.encodeTensorData (TF.Shape [fromIntegral $ R.rank shR])
-                         $ V.fromList dims
-                  adata' = evalState (array eR adata) 0
+            go LeftHandSideWildcard{}                   _                  env = return env
+            go (LeftHandSidePair aR bR)                 (a, b)             env = go bR b =<< go aR a env
+            go (LeftHandSideSingle (R.ArrayR _shR _eR)) (R.Array _sh _adata) env = state $ \i ->
+              let
+                  sh'    = evalState (shape _shR _sh) 0
+                  adata' = evalState (array _eR _adata) 0
+
+                  shape :: ShapeR sh -> sh -> State Int [TF.Feed]
+                  shape ShapeRz          ()     = return []
+                  shape (ShapeRsnoc shR) (t, h) = do
+                    h' <- state $ \j ->
+                           let tensorDataBytes = V.fromListN 1 [fromIntegral h :: ScalarTensorDataR Int]
+                               tensorDataShape = TF.Shape [1]
+                           in
+                           (TF.feed (TF.tensorValueFromName (T.pack (printf "input%d_shape%d" i j))) (TF.encodeTensorData tensorDataShape tensorDataBytes), j+1)
+                    t' <- shape shR t
+                    return (h' : t')
 
                   array :: TypeR t -> ArrayData t -> State Int [TF.Feed]
                   array TupRunit         ()     = return []
@@ -140,13 +150,13 @@ runN acc =
                   feed :: forall t s. (Storable t, TF.TensorType s, s ~ ScalarTensorDataR t) => UniqueArray t -> State Int TF.Feed
                   feed ua = state $ \j ->
                     let fp                   = unsafeGetValue (uniqueArrayData ua)
-                        tensorDataBytes      = V.unsafeFromForeignPtr0 (castForeignPtr fp :: ForeignPtr Word8) (R.size shR sh * sizeOf (undefined :: t))
+                        tensorDataBytes      = V.unsafeFromForeignPtr0 (castForeignPtr fp :: ForeignPtr Word8) (R.size _shR _sh * sizeOf (undefined :: t))
                         tensorDataType       = TF.tensorType (undefined :: s)
-                        tensorDataDimensions = dims
+                        tensorDataDimensions = [ fromIntegral x :: ScalarTensorDataR Int | x <- reverse (R.shapeToList _shR _sh) ]
                     in
                     (TF.feed (TF.tensorValueFromName (T.pack (printf "input%d_adata%d" i j))) (TF.TensorData (Internal.TensorData {..})), j+1)
               in
-              (sh' : adata' ++ env, i+1)
+              (sh' ++ adata' ++ env, i+1)
 
             (aenv', next) = runState (go lhs (fromArr arr) aenv) skip
         in

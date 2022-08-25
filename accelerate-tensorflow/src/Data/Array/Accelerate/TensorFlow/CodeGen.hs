@@ -35,6 +35,7 @@ import Data.Array.Accelerate.AST.Environment                        ( weakenEmpt
 import Data.Array.Accelerate.AST.Idx
 import Data.Array.Accelerate.AST.LeftHandSide
 import Data.Array.Accelerate.AST.Var
+import Data.Array.Accelerate.Analysis.Match
 import Data.Array.Accelerate.Array.Data
 import Data.Array.Accelerate.Array.Unique
 import Data.Array.Accelerate.Lifetime
@@ -85,7 +86,10 @@ buildOpenAfun aenv (Alam lhs f) = do
             shape :: ShapeR sh -> State Int (TensorShape sh)
             shape ShapeRz          = return ()
             shape (ShapeRsnoc shR) = do
-              sz <- state $ \j -> (TF.placeholder' (TF.opName .~ TF.explicitName (T.pack (printf "input%d_shape%d" i j))), j+1)
+              sz <- state $ \j ->
+                      let opName  = TF.opName .~ TF.explicitName (T.pack (printf "input%d_shape%d" i j))
+                          opShape = TF.opAttr "shape" .~ TF.Shape [1]
+                      in (TF.placeholder' (opShape . opName), j+1)
               sh <- shape shR
               return (sh, sz)
 
@@ -144,7 +148,7 @@ buildOpenAfun aenv (Abody f) =
             shape :: ShapeR sh -> TensorShape sh -> State Int (TensorShape sh)
             shape ShapeRz         ()     = return ()
             shape (ShapeRsnoc tR) (t, h) = do
-              h' <- state $ \j -> (TF.identity' (TF.opName .~ TF.explicitName (T.pack (printf "input%d_shape%d" i j))) h, j+1)
+              h' <- state $ \j -> (TF.identity' (TF.opName .~ TF.explicitName (T.pack (printf "output%d_shape%d" i j))) h, j+1)
               t' <- shape tR t
               return (t', h')
 
@@ -215,7 +219,7 @@ buildOpenAcc aenv (OpenAcc pacc) =
         let
             shape :: ShapeR sh -> sh -> TensorShape sh
             shape ShapeRz         ()     = ()
-            shape (ShapeRsnoc tR) (t, h) = (shape tR t, TF.scalar (fromIntegral h))
+            shape (ShapeRsnoc tR) (t, h) = (shape tR t, TF.constant (TF.Shape [1]) [fromIntegral h])
 
             array :: TypeR t -> ArrayData t -> TensorArrayData t
             array TupRunit ()             = ()
@@ -232,7 +236,7 @@ buildOpenAcc aenv (OpenAcc pacc) =
                       node :: TF.TensorProto
                       node = def
                            & TF.dtype .~ TF.tensorType (undefined :: s)
-                           & TF.tensorShape.TensorShape.dim .~ [ def & TensorShape.size .~ fromIntegral x | x <- shapeToList shR sh ]
+                           & TF.tensorShape.TensorShape.dim .~ [ def & TensorShape.size .~ fromIntegral x | x <- reverse $ shapeToList shR sh ]
                            & TF.tensorContent .~ values
                   in
                   TF.const' (TF.opAttr "value" .~ node)
@@ -334,7 +338,7 @@ buildOpenAcc aenv (OpenAcc pacc) =
             pad :: SliceIndex slix sl co sh -> TensorShape sl -> TensorShape sh
             pad SliceNil              ()       = ()
             pad (SliceAll sliceIdx)   (sl, sz) = (pad sliceIdx sl, sz)
-            pad (SliceFixed sliceIdx) sl       = (pad sliceIdx sl, TF.scalar 1)
+            pad (SliceFixed sliceIdx) sl       = (pad sliceIdx sl, TF.constant (TF.Shape [1]) [1])
 
             array :: TypeR s -> TensorArrayData s -> TensorArrayData s
             array TupRunit         ()     = ()
@@ -441,25 +445,20 @@ buildOpenAcc aenv (OpenAcc pacc) =
           -> Fun aenv (sh' -> sh)
           -> OpenAcc aenv (Array sh e)
           -> Tensor sh' e
-      backpermuteL shR' _sh' p acc
-        | ArrayR shR _                    <- arrayR acc
-        , ShapeRsnoc (ShapeRsnoc ShapeRz) <- shR
-        , ShapeRsnoc (ShapeRsnoc ShapeRz) <- shR'
-        , Lam _ (Body b)                  <- p
-        , Let lhs bnd bod                 <- b
-        , LeftHandSidePair l r            <- lhs
-        , Pair x y                        <- bod
-        , Let xlhs xbnd xbod              <- x
-        , LeftHandSidePair xl xr          <- xlhs
-        , Pair bl br                      <- xbod
-        , Nil                             <- bl
-        , Evar (Var _ (SuccIdx ZeroIdx))  <- br
-        , Evar (Var _ ZeroIdx)            <- y
-        -- TODO: check the result shape?
-        -- TODO: check the following variables?
-        --         - l, xl
-        --         - r, xr
-        --         - bnd, xbd
+      backpermuteL shR' sh' p acc
+        | ArrayR shR _                              <- arrayR acc
+        , ShapeRsnoc (ShapeRsnoc ShapeRz)           <- shR
+        , ShapeRsnoc (ShapeRsnoc ShapeRz)           <- shR'
+        -- Shape of the result is the transpose of calling 'shape' on the input argument
+        , Let _ (Shape u) s                         <- sh'
+        , Nil `Pair` Evar (Var _ ZeroIdx)
+              `Pair` Evar (Var _ (SuccIdx ZeroIdx)) <- s
+        , OpenAcc (Avar v)                          <- acc
+        , Just Refl                                 <- matchVar u v
+        -- Permutation function is the transpose of each index
+        , Lam _ (Body b)                            <- p
+        , Nil `Pair` Evar (Var _ ZeroIdx)
+              `Pair` Evar (Var _ (SuccIdx ZeroIdx)) <- b
         = transposeL acc
 
         | otherwise
@@ -553,5 +552,5 @@ buildOpenAcc aenv (OpenAcc pacc) =
 
 singleton :: ShapeR sh -> TensorShape sh
 singleton ShapeRz          = ()
-singleton (ShapeRsnoc shR) = (singleton shR, TF.scalar 1)
+singleton (ShapeRsnoc shR) = (singleton shR, TF.constant (TF.Shape [1]) [1])
 

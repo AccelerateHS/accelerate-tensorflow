@@ -32,12 +32,13 @@ import Data.Array.Accelerate.Array.Data
 import Data.Array.Accelerate.Array.Unique
 import Data.Array.Accelerate.Lifetime
 import Data.Array.Accelerate.Representation.Array                             as R ( ArraysR )
+import Data.Array.Accelerate.Representation.Shape
 import Data.Array.Accelerate.Representation.Type
-import Data.Array.Accelerate.Sugar.Array                                      as Sugar
+import Data.Array.Accelerate.Sugar.Array                                      as Sugar ( Arrays(..) )
 import Data.Array.Accelerate.Trafo.Sharing
+import Data.Array.Accelerate.Trafo.Simplify
 import Data.Array.Accelerate.Type
 import qualified Data.Array.Accelerate.Representation.Array                   as R
-import qualified Data.Array.Accelerate.Representation.Shape                   as R
 import qualified Data.Array.Accelerate.Smart                                  as Smart
 
 import Data.Array.Accelerate.TensorFlow.CodeGen.Base
@@ -61,7 +62,6 @@ import Foreign.Storable
 import System.IO.Unsafe
 import Text.Printf
 import qualified Data.ByteString.Unsafe                                       as B
-import qualified Data.Vector.Storable                                         as V
 import Prelude                                                                as P
 
 
@@ -93,7 +93,7 @@ compile :: forall f. Afunction f => f -> RepresentativeData (AfunctionR f) -> Mo
 compile acc args = unsafePerformIO $ Model afunR (modelAfun afunR tfun x) <$> compileTfunWith tfun (x:xs)
   where
     !afunR = afunctionRepr @f
-    !afun  = convertAfun acc
+    !afun  = simplifyAfun (convertAfun acc)
     !tfun  = buildAfunWith afun x
     x:xs   = map (fromArgs afunR) args
 
@@ -176,7 +176,7 @@ execute (Model afunR fun buffer) = eval afunR fun 0 []
                   let tensorName      = printf "output%d_adata%d" i j
                       tensorType      = R.tagOfType (scalarType @t)
                       tensorDataBytes = castForeignPtr (unsafeGetValue (uniqueArrayData ua))
-                      tensorSizeBytes = fromIntegral $ R.size shR sh * sizeOf (undefined :: t)
+                      tensorSizeBytes = fromIntegral $ size shR sh * sizeOf (undefined :: t)
                   in
                   (Feed{..}, j+1)
             --
@@ -192,20 +192,11 @@ execute (Model afunR fun buffer) = eval afunR fun 0 []
     eval (AfunctionReprLam lamR) (Mlam lhs f) skip aenv = \arr ->
       let
           go :: ALeftHandSide t aenv aenv' -> t -> [Feed] -> State Int [Feed]
-          go LeftHandSideWildcard{}                 _                  env = return env
-          go (LeftHandSidePair aR bR)               (a, b)             env = go bR b =<< go aR a env
-          go (LeftHandSideSingle (R.ArrayR shR eR)) (R.Array sh adata) env = state $ \i ->
-            let dims   = castForeignPtr
-                       $ fst
-                       $ V.unsafeToForeignPtr0
-                       $ V.fromList
-                       $ [ fromIntegral x :: Int64 | x <- R.shapeToList shR sh ]
-                sh'    = Feed { tensorName      = printf "input%d_shape" i
-                              , tensorType      = R.tagOfType (scalarType @Int64)
-                              , tensorSizeBytes = fromIntegral $ R.size shR sh * sizeOf (undefined :: Int64)
-                              , tensorDataBytes = dims
-                              }
-                adata' = evalState (array eR adata) 0
+          go LeftHandSideWildcard{}                   _                    env = return env
+          go (LeftHandSidePair aR bR)                 (a, b)               env = go bR b =<< go aR a env
+          go (LeftHandSideSingle (R.ArrayR _shR _eR)) (R.Array _sh _adata) env = state $ \i ->
+            let
+                adata' = evalState (array _eR _adata) 0
 
                 array :: TypeR t -> ArrayData t -> State Int [Feed]
                 array TupRunit         ()     = return []
@@ -248,11 +239,11 @@ execute (Model afunR fun buffer) = eval afunR fun 0 []
                   let tensorName      = printf "input%d_adata%d" i j
                       tensorType      = R.tagOfType (scalarType @t)
                       tensorDataBytes = castForeignPtr (unsafeGetValue (uniqueArrayData ua))
-                      tensorSizeBytes = fromIntegral $ R.size shR sh * sizeOf (undefined :: t)
+                      tensorSizeBytes = fromIntegral $ size _shR _sh * sizeOf (undefined :: t)
                   in
                   (Feed{..}, j+1)
             in
-            (sh' : adata' ++ env, i+1)
+            (adata' ++ env, i+1)
 
           (aenv', next) = runState (go lhs (fromArr arr) aenv) skip
       in
