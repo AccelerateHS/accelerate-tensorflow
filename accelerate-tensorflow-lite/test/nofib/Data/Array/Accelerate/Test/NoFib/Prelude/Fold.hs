@@ -42,6 +42,7 @@ test_fold =
   testGroup "fold"
     [ testDim dim1
     , testDim dim2
+    , testDim dim3
     ]
     where
       testDim :: forall sh. (Shape sh, Show sh, P.Eq sh)

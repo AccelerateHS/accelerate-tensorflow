@@ -419,20 +419,20 @@ buildOpenAcc aenv (OpenAcc pacc) =
                   num (FloatingNumType t) = floating t
 
                   integral :: IntegralType t -> TensorArrayData t -> TensorArrayData t
-                  integral TypeInt8   x = TF.sum x (TF.scalar @Int32 (fromIntegral (rank shR')))
-                  integral TypeInt16  x = TF.sum x (TF.scalar @Int32 (fromIntegral (rank shR')))
-                  integral TypeInt32  x = TF.sum x (TF.scalar @Int32 (fromIntegral (rank shR')))
-                  integral TypeInt64  x = TF.sum x (TF.scalar @Int32 (fromIntegral (rank shR')))
-                  integral TypeWord8  x = TF.sum x (TF.scalar @Int32 (fromIntegral (rank shR')))
-                  integral TypeWord16 x = TF.sum x (TF.scalar @Int32 (fromIntegral (rank shR')))
-                  integral TypeWord32 x = TF.sum x (TF.scalar @Int32 (fromIntegral (rank shR')))
-                  integral TypeWord64 x = TF.sum x (TF.scalar @Int32 (fromIntegral (rank shR')))
-                  integral TypeInt    x = TF.sum x (TF.scalar @Int32 (fromIntegral (rank shR')))
-                  integral TypeWord   x = TF.sum x (TF.scalar @Int32 (fromIntegral (rank shR')))
+                  integral TypeInt8   x = TF.sum x (TF.scalar @Int32 0)
+                  integral TypeInt16  x = TF.sum x (TF.scalar @Int32 0)
+                  integral TypeInt32  x = TF.sum x (TF.scalar @Int32 0)
+                  integral TypeInt64  x = TF.sum x (TF.scalar @Int32 0)
+                  integral TypeWord8  x = TF.sum x (TF.scalar @Int32 0)
+                  integral TypeWord16 x = TF.sum x (TF.scalar @Int32 0)
+                  integral TypeWord32 x = TF.sum x (TF.scalar @Int32 0)
+                  integral TypeWord64 x = TF.sum x (TF.scalar @Int32 0)
+                  integral TypeInt    x = TF.sum x (TF.scalar @Int32 0)
+                  integral TypeWord   x = TF.sum x (TF.scalar @Int32 0)
 
                   floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t
-                  floating TypeFloat  x = TF.sum x (TF.scalar @Int32 (fromIntegral (rank shR')))
-                  floating TypeDouble x = TF.sum x (TF.scalar @Int32 (fromIntegral (rank shR')))
+                  floating TypeFloat  x = TF.sum x (TF.scalar @Int32 0)
+                  floating TypeDouble x = TF.sum x (TF.scalar @Int32 0)
                   floating TypeHalf   _ = unsupported "half-precision floating point"
               in
               scalar aR a
