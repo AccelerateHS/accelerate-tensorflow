@@ -176,7 +176,8 @@ shapeToTensor shR                  sh       =
       go ShapeRz         ()     acc = acc
       go (ShapeRsnoc tR) (t, h) acc = go tR t (h : acc)
   in
-  TF.concat (TF.scalar 0) (go shR sh [])
+  -- XXX: Why is this reshape necessary?
+  TF.concat (TF.scalar 0) [ TF.reshape x (TF.constant (TF.Shape [1]) [1 :: ScalarTensorDataR Int]) | x <- go shR sh [] ]
 
 primConst
     :: ShapeR sh
