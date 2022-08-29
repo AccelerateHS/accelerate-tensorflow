@@ -25,7 +25,7 @@ import Data.Array.Accelerate                                        as A
 import Data.Array.Accelerate.Interpreter                            as I
 import Data.Array.Accelerate.TensorFlow.Lite                        as TPU
 
-import Data.Array.Accelerate.Sugar.Shape
+import Data.Array.Accelerate.Sugar.Shape                            as S
 
 import Hedgehog
 import qualified Hedgehog.Gen                                       as Gen
@@ -50,22 +50,44 @@ test_fold =
               -> TestTree
       testDim dim =
         testGroup ("DIM" P.++ show (rank @(sh :. Int)))
-          [ testProperty "sum" $ test_sum dim f32
+          [ testProperty "sum"     $ prop_fold (+) 0 dim f32
+          , testProperty "product" $ prop_fold1 (*) dim f32
+          , testProperty "minimum" $ prop_fold1 A.min dim f32
+          , testProperty "maximum" $ prop_fold1 A.max dim f32
           ]
 
-test_sum
+prop_fold
     :: (P.Eq sh, Show sh, Shape sh, A.Num e, Show e, Similar e)
-    => Gen (sh :. Int)
+    => (Exp e -> Exp e -> Exp e)
+    -> Exp e
+    -> Gen (sh :. Int)
     -> Gen e
     -> Property
-test_sum dim e =
+prop_fold f z dim e =
   property $ do
     sh  <- forAll dim
     dat <- forAllWith (const "sample-data") (generate_sample_data sh e)
     xs  <- forAll (array sh e)
-    let f    = A.sum
-        !ref = I.runN f
-        !tpu = TPU.compile f dat
+    let acc  = A.fold f z
+        !ref = I.runN acc
+        !tpu = TPU.compile acc dat
+    --
+    TPU.execute tpu xs ~~~ ref xs
+
+prop_fold1
+    :: (P.Eq sh, Show sh, Shape sh, A.Num e, Show e, Similar e)
+    => (Exp e -> Exp e -> Exp e)
+    -> Gen (sh :. Int)
+    -> Gen e
+    -> Property
+prop_fold1 f dim e =
+  property $ do
+    sh  <- forAll (dim `except` \sh -> S.size sh P.== 0)
+    dat <- forAllWith (const "sample-data") (generate_sample_data sh e)
+    xs  <- forAll (array sh e)
+    let acc  = A.fold1 f
+        !ref = I.runN acc
+        !tpu = TPU.compile acc dat
     --
     TPU.execute tpu xs ~~~ ref xs
 

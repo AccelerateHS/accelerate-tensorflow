@@ -1,8 +1,10 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications    #-}
 {-# OPTIONS_HADDOCK hide #-}
@@ -383,23 +385,37 @@ buildOpenAcc aenv (OpenAcc pacc) =
             -> Tensor sh e
       foldL f z xs
         | Lam LeftHandSideSingle{} (Lam LeftHandSideSingle{} (Body b)) <- f
-        , PrimApp (PrimAdd _) (Pair x y)                               <- b
+        , PrimApp op (Pair x y)                                        <- b
         , Evar (Var _ (SuccIdx ZeroIdx))                               <- x
         , Evar (Var _ ZeroIdx)                                         <- y
-        , True <- case z of
-            Nothing -> True
-            Just (Const (SingleScalarType (NumSingleType n)) v)
-              | IntegralNumType t <- n, IntegralDict <- integralDict t -> v == 0
-              | FloatingNumType t <- n, FloatingDict <- floatingDict t -> v == 0
-            _ -> False
-        = sumL xs
+        , Just reduce                                                  <-
+            case op of
+              PrimAdd _ ->
+                case z of
+                  Nothing -> Just sumL
+                  Just (Const (SingleScalarType (NumSingleType n)) v)
+                    | IntegralNumType t <- n, IntegralDict <- integralDict t, v == 0 -> Just sumL
+                    | FloatingNumType t <- n, FloatingDict <- floatingDict t, v == 0 -> Just sumL
+                  _ -> Nothing
+              PrimMul _ ->
+                case z of
+                  Nothing -> Just prodL
+                  Just (Const (SingleScalarType (NumSingleType n)) v)
+                    | IntegralNumType t <- n, IntegralDict <- integralDict t, v == 1 -> Just prodL
+                    | FloatingNumType t <- n, FloatingDict <- floatingDict t, v == 1 -> Just prodL
+                  _ -> Nothing
+              PrimMax _ | Nothing <- z -> Just maximumL
+              PrimMin _ | Nothing <- z -> Just minimumL
+              _ -> Nothing
+        = reduce xs
 
         | otherwise
         = unsupported "fold"
 
-      sumL :: OpenAcc aenv (Array (sh, Int) e)
-           -> Tensor sh e
-      sumL acc =
+      reduceL :: (forall a. TF.OneOf '[Int8, Int16, Int32, Int64, Word8, Word16, Word32, Word64, Float, Double] a => TF.Tensor TF.Build a -> TF.Tensor TF.Build Int32 -> TF.Tensor TF.Build a)
+              -> OpenAcc aenv (Array (sh, Int) e)
+              -> Tensor sh e
+      reduceL reduce acc =
         let Tensor (ArrayR (ShapeRsnoc shR') eR) (sh', _) xs' = buildA acc
 
             array :: TypeR t -> TensorArrayData t -> TensorArrayData t
@@ -419,25 +435,37 @@ buildOpenAcc aenv (OpenAcc pacc) =
                   num (FloatingNumType t) = floating t
 
                   integral :: IntegralType t -> TensorArrayData t -> TensorArrayData t
-                  integral TypeInt8   x = TF.sum x (TF.scalar @Int32 0)
-                  integral TypeInt16  x = TF.sum x (TF.scalar @Int32 0)
-                  integral TypeInt32  x = TF.sum x (TF.scalar @Int32 0)
-                  integral TypeInt64  x = TF.sum x (TF.scalar @Int32 0)
-                  integral TypeWord8  x = TF.sum x (TF.scalar @Int32 0)
-                  integral TypeWord16 x = TF.sum x (TF.scalar @Int32 0)
-                  integral TypeWord32 x = TF.sum x (TF.scalar @Int32 0)
-                  integral TypeWord64 x = TF.sum x (TF.scalar @Int32 0)
-                  integral TypeInt    x = TF.sum x (TF.scalar @Int32 0)
-                  integral TypeWord   x = TF.sum x (TF.scalar @Int32 0)
+                  integral TypeInt8   x = reduce x (TF.scalar @Int32 0)
+                  integral TypeInt16  x = reduce x (TF.scalar @Int32 0)
+                  integral TypeInt32  x = reduce x (TF.scalar @Int32 0)
+                  integral TypeInt64  x = reduce x (TF.scalar @Int32 0)
+                  integral TypeWord8  x = reduce x (TF.scalar @Int32 0)
+                  integral TypeWord16 x = reduce x (TF.scalar @Int32 0)
+                  integral TypeWord32 x = reduce x (TF.scalar @Int32 0)
+                  integral TypeWord64 x = reduce x (TF.scalar @Int32 0)
+                  integral TypeInt    x = reduce x (TF.scalar @Int32 0)
+                  integral TypeWord   x = reduce x (TF.scalar @Int32 0)
 
                   floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t
-                  floating TypeFloat  x = TF.sum x (TF.scalar @Int32 0)
-                  floating TypeDouble x = TF.sum x (TF.scalar @Int32 0)
+                  floating TypeFloat  x = reduce x (TF.scalar @Int32 0)
+                  floating TypeDouble x = reduce x (TF.scalar @Int32 0)
                   floating TypeHalf   _ = unsupported "half-precision floating point"
               in
               scalar aR a
         in
         Tensor (ArrayR shR' eR) sh' (array eR xs')
+
+      sumL :: OpenAcc aenv (Array (sh, Int) e) -> Tensor sh e
+      sumL = reduceL TF.sum
+
+      prodL :: OpenAcc aenv (Array (sh, Int) e) -> Tensor sh e
+      prodL = reduceL TF.prod
+
+      minimumL :: OpenAcc aenv (Array (sh, Int) e) -> Tensor sh e
+      minimumL = reduceL TF.min
+
+      maximumL :: OpenAcc aenv (Array (sh, Int) e) -> Tensor sh e
+      maximumL = reduceL TF.max
 
       backpermuteL
           :: ShapeR sh'

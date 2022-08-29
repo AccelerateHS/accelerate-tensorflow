@@ -22,6 +22,7 @@ import Hedgehog.Internal.Source                                     ( HasCallSta
 import qualified Hedgehog.Gen                                       as Gen
 import qualified Hedgehog.Range                                     as Range
 
+import Control.Monad
 import Prelude                                                      hiding ( (!!) )
 
 
@@ -51,6 +52,12 @@ array sh gen = fromList sh <$> Gen.list (Range.singleton (size sh)) gen
 
 f32 :: Gen Float
 f32 = Gen.float (Range.linearFracFrom 0 (-1) 1)
+
+except :: Gen e -> (e -> Bool) -> Gen e
+except gen f  = do
+  v <- gen
+  when (f v) Gen.discard
+  return v
 
 
 -- | Fails the test if the two arguments are not equal, allowing for a small
