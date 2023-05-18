@@ -49,7 +49,7 @@ library
   cxx-sources:
       cbits/edgetpu.cc
   extra-libraries:
-      stdc++ edgetpu farmhash tensorflow-lite ruy XNNPACK flatbuffers pthreadpool fft2d_fftsg fft2d_fftsg2d cpuinfo clog
+      tensorflow-lite
   build-depends:
       accelerate ==1.3.*
     , accelerate-tensorflow

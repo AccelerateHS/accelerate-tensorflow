@@ -1,3 +1,10 @@
 .stack-work/
+dist-newstyle/
 *~
 /stack.yaml.lock
+
+# Tensorflow build directory
+build/
+
+# Generated from cabal.project.in
+cabal.project

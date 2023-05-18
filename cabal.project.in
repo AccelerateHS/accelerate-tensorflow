@@ -1,0 +1,20 @@
+packages:
+  accelerate-tensorflow
+  accelerate-tensorflow-lite
+  extra-deps/tensorflow-haskell/tensorflow
+  extra-deps/tensorflow-haskell/tensorflow-core-ops
+  extra-deps/tensorflow-haskell/tensorflow-opgen
+  extra-deps/tensorflow-haskell/tensorflow-ops
+  extra-deps/tensorflow-haskell/tensorflow-proto
+  extra-deps/accelerate
+
+with-compiler: ghc-8.10.7
+
+package accelerate-tensorflow-lite
+  extra-include-dirs:
+    $PWD/build/flatbuffers/include
+  extra-lib-dirs:
+    $PWD/build
+
+package accelerate
+  flags: +nofib

@@ -26,7 +26,7 @@ To build a (local) copy of tensorflow-lite:
 ```sh
 mkdir build
 cd build
-cmake ../extra-deps/tensorflow/tensorflow/lite
+cmake ../extra-deps/tensorflow-haskell/third_party/tensorflow/tensorflow/lite -DBUILD_SHARED_LIBS=1
 cmake --build . -j
 ```
 
