@@ -19,39 +19,19 @@ Accelerate, refer to the [main repository](https://github.com/AccelerateHS/accel
 Contributions and bug reports are welcome!<br>
 Please feel free to contact me through [GitHub](https://github.com/AccelerateHS/accelerate) or [gitter.im](https://gitter.im/AccelerateHS/Lobby).
 
-## Here be dragons
-
-To build a (local) copy of tensorflow-lite:
+## Compiling using Cabal
 
 ```sh
-mkdir build
-cd build
-cmake ../extra-deps/tensorflow-haskell/third_party/tensorflow/tensorflow/lite -DBUILD_SHARED_LIBS=1
-cmake --build . -j
+# The following 3 commands can also be done in one go using `make setup`:
+make submodules     # git submodule update --init --recursive
+make tfbuild        # build Tensorflow inside newly-created build/ directory
+make cabal.project  # rewrites $PWD in cabal.project.in to make cabal.project
+
+cabal build all
 ```
 
-## Installing the TensorFlow C-libraries
-
-The TensorFlow C-bindings are required to build this project. In order to
-install them, follow the instructions provided by
-[TensorFlow](https://www.tensorflow.org/install/lang_c). Make sure to install
-the TensorFlow 2.3.0
-[CPU](https://storage.googleapis.com/tensorflow/libtensorflow/libtensorflow-cpu-linux-x86_64-2.3.0.tar.gz)
-or
-[GPU](https://storage.googleapis.com/tensorflow/libtensorflow/libtensorflow-gpu-linux-x86_64-2.3.0.tar.gz)
-bindings, and not the latest version, since this is the version required by the
-TensorFlow-Haskell dependency. As such, we recommend not installing in the
-default location (/usr/local on Linux or MacOS systems), but to a different
-location. To make sure the build succeeds, you need to tell stack where to find
-these files, using the `extra-lib-dirs` and `extra-include-dirs` fields. Make
-sure to set the `LIBRARY_PATH` and `LD_LIBRARY_PATH` as described in the
-installation instructions as well.
-
-## Installing protoc
-
-To build the required TensorFlow and TensorFlow-haskell packages, you need to
-have protoc installed. If you do not have it installed, follow the directions on
-[this webpage](https://google.github.io/proto-lens/installing-protoc.html).
+This uses the Tensorflow submodule already contained within the tensorflow-haskell submodule.
+Currently, this is Tensorflow 2.10.1.
 
 ## Installing the edgetpu library
 
@@ -63,7 +43,15 @@ Follow the instructions from [Coral](https://coral.ai/software/#debian-packages)
  - edgetpu\_compiler
  - libedgetpu1-std (recommended unless the higher frequency is required)
 
-## Installing other dependencies
+## TODO check if this is still required
+
+### Installing protoc
+
+To build the required TensorFlow and TensorFlow-haskell packages, you need to
+have protoc installed. If you do not have it installed, follow the directions on
+[this webpage](https://google.github.io/proto-lens/installing-protoc.html).
+
+### Installing other dependencies
 
 Other dependencies have to be installed manually before running `stack build`.
 Among these are cpuinfo, farmhash. (TODO: find out what exactly is on this
