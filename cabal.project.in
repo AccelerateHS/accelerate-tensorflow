@@ -16,5 +16,9 @@ package accelerate-tensorflow-lite
   extra-lib-dirs:
     $PWD/build
 
+package tensorflow
+  extra-lib-dirs:
+    $PWD/libtf-dl/lib
+
 package accelerate
   flags: +nofib

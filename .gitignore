@@ -6,5 +6,8 @@ dist-newstyle/
 # Tensorflow build directory
 build/
 
+# Libtensorflow download directory
+libtf-dl/
+
 # Generated from cabal.project.in
 cabal.project

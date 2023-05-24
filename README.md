@@ -22,16 +22,19 @@ Please feel free to contact me through [GitHub](https://github.com/AccelerateHS/
 ## Compiling using Cabal
 
 ```sh
-# The following 3 commands can also be done in one go using `make setup`:
+# The following 4 commands can also be done in one go using `make setup`:
 make submodules     # git submodule update --init --recursive
-make tfbuild        # build Tensorflow inside newly-created build/ directory
+make tfbuild        # build Tensorflow Lite inside newly-created build/ directory
+make libtf-dl/lib/libtensorflow.so  # download a libtensorflow, because Bazel is a nuisance
 make cabal.project  # rewrites $PWD in cabal.project.in to make cabal.project
 
-cabal build all
+env LD_LIBRARY_PATH=$PWD/libtf-dl/lib cabal build all
 ```
 
 This uses the Tensorflow submodule already contained within the tensorflow-haskell submodule.
 Currently, this is Tensorflow 2.10.1.
+
+TFLite is compiled from the submodule and TF itself is not because TFLite can be compiled using CMake, and TF itself seems to need compilation with Bazel, which is annoying to install and use. Hence we download the required .so from the upstream release for TF itself.
 
 ## Installing the edgetpu library
 
