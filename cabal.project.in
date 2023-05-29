@@ -18,7 +18,8 @@ package accelerate-tensorflow-lite
 
 package tensorflow
   extra-lib-dirs:
-    $PWD/libtf-dl/lib
+    $PWD/lib-links
+    $PWD/extra-deps/tensorflow-haskell/third_party/tensorflow/bazel-bin/tensorflow
 
 package accelerate
   flags: +nofib

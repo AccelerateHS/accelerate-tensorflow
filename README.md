@@ -24,11 +24,17 @@ Please feel free to contact me through [GitHub](https://github.com/AccelerateHS/
 ```sh
 # The following 4 commands can also be done in one go using `make setup`:
 make submodules     # git submodule update --init --recursive
-make tfbuild        # build Tensorflow Lite inside newly-created build/ directory
-make libtf-dl/lib/libtensorflow.so  # download a libtensorflow, because Bazel is a nuisance
+make tflitebuild    # build Tensorflow Lite inside newly-created build/ directory
+make tfbuild        # build Tensorflow with Bazel (Bazel is auto-downloaded)
+make tf-lib-links   # extra symlinks in Bazel bin folder because Bazel is dumb
 make cabal.project  # rewrites $PWD in cabal.project.in to make cabal.project
 
-env LD_LIBRARY_PATH=$PWD/libtf-dl/lib cabal build all
+LIBDIR="$PWD/extra-deps/tensorflow-haskell/third_party/tensorflow/bazel-bin/tensorflow"
+
+env LD_LIBRARY_PATH="$LIBDIR" cabal build all
+
+# To run tests:
+env LD_LIBRARY_PATH="$LIBDIR:$PWD/build" cabal run nofib-tensorflow-lite
 ```
 
 This uses the Tensorflow submodule already contained within the tensorflow-haskell submodule.

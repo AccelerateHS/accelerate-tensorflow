@@ -11,3 +11,6 @@ libtf-dl/
 
 # Generated from cabal.project.in
 cabal.project
+
+# Downloaded Bazel executable
+bazel511

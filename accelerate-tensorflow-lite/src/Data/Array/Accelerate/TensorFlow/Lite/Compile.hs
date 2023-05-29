@@ -112,6 +112,7 @@ edgetpu_compile path = do
 tflite_model :: TF.GraphDef -> Builder -> IO FilePath
 tflite_model graph xs = do
   convert         <- getDataFileName "converter.py"
+  python_exe      <- getDataFileName "tf-python-venv/bin/python3"
   tmp_dir         <- getTemporaryDirectory
   (pb_file, pb_h) <- openBinaryTempFile tmp_dir "model.pb"      -- TODO: be exception safe
   (tf_file, tf_h) <- openBinaryTempFile tmp_dir "model.tflite"  -- TODO: be exception safe
@@ -127,7 +128,7 @@ tflite_model graph xs = do
       inputs  = filter (T.isPrefixOf "input") names
       outputs = filter (T.isPrefixOf "output") names
       --
-      cp      = (proc "python3" flags) { std_in = NoStream, std_out = NoStream, std_err = CreatePipe }
+      cp      = (proc python_exe flags) { std_in = NoStream, std_out = NoStream, std_err = CreatePipe }
       flags   = [ convert
                 , "--graph_def_file=" ++ pb_file
                 , "--output_file=" ++ tf_file
