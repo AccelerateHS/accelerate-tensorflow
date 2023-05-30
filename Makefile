@@ -17,8 +17,16 @@ help:
 	@echo "    'libedgetpu': Build libedgetpu.so"
 	@echo "    'libedgetpu-lib-links': Additional .so symlinks in libedgetpu bin dir"
 	@echo "    'cabal.project': Creates cabal.project from cabal.project.in (with envsubst)"
+	@echo "Note: DO NOT USE -j with this Makefile. Parallelism is exploited already, and you can only break things."
 
-setup: submodules tflitebuild tfbuild tf-lib-links libedgetpu libedgetpu-lib-links cabal.project
+# Don't list these targets as dependencies here so that things don't go _quite_ as horribly wrong when someone misguidedly uses -j with this Makefile
+setup:
+	$(MAKE) submodules
+	$(MAKE) tflitebuild tfbuild
+	$(MAKE) tf-lib-links
+	$(MAKE) libedgetpu
+	$(MAKE) libedgetpu-lib-links
+	$(MAKE) cabal.project
 
 submodules:
 	@if git status --porcelain | grep extra-deps >/dev/null; then \
