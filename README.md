@@ -22,19 +22,14 @@ Please feel free to contact me through [GitHub](https://github.com/AccelerateHS/
 ## Compiling using Cabal
 
 ```sh
-# The following 4 commands can also be done in one go using `make setup`:
-make submodules     # git submodule update --init --recursive
-make tflitebuild    # build Tensorflow Lite inside newly-created build/ directory
-make tfbuild        # build Tensorflow with Bazel (Bazel is auto-downloaded)
-make tf-lib-links   # extra symlinks in Bazel bin folder because Bazel is dumb
-make cabal.project  # rewrites $PWD in cabal.project.in to make cabal.project
+make setup  # see 'make help' for what this does; note, can take hours as this also builds a full copy of Tensorflow
 
-LIBDIR="$PWD/extra-deps/tensorflow-haskell/third_party/tensorflow/bazel-bin/tensorflow"
+ENV="$PWD/extra-deps/tensorflow-haskell/third_party/tensorflow/bazel-bin/tensorflow:$PWD/extra-deps/libedgetpu/out/throttled/k8:$PWD/build:$(echo "$PWD/build/_deps/abseil-cpp-build/absl/"{flags,hash,container,strings} | sed 's/ /:/g')"
 
-env LD_LIBRARY_PATH="$LIBDIR" cabal build all
+env LD_LIBRARY_PATH="$ENV" cabal build all
 
 # To run tests:
-env LD_LIBRARY_PATH="$LIBDIR:$PWD/build" cabal run nofib-tensorflow-lite
+env LD_LIBRARY_PATH="$ENV" cabal run nofib-tensorflow-lite
 ```
 
 This uses the Tensorflow submodule already contained within the tensorflow-haskell submodule.

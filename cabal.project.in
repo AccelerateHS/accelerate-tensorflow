@@ -15,6 +15,7 @@ package accelerate-tensorflow-lite
     $PWD/build/flatbuffers/include
   extra-lib-dirs:
     $PWD/build
+    $PWD/extra-deps/libedgetpu/out/throttled/k8
 
 package tensorflow
   extra-lib-dirs:

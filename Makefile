@@ -55,12 +55,14 @@ tf-lib-links: $(TF_LIB_LINKS)
 $(TF_LIB_LINKS):
 	ln -s libtensorflow.so.2.10.1 $@
 
+ABSL_LD_FLAGS := $(addprefix -L$(PWD)/build/_deps/abseil-cpp-build/absl/,flags hash container strings)
+
 libedgetpu:
 	cd extra-deps/libedgetpu && \
 		env TFROOT=$(PWD)/extra-deps/tensorflow-haskell/third_party/tensorflow \
 		make -f makefile_build/Makefile \
-			CXXFLAGS=-I$(PWD)/build/flatbuffers/include \
-			LDFLAGS='-L$(PWD)/build/_deps/flatbuffers-build -L$(PWD)/build/_deps/abseil-cpp-build/absl/flags' \
+			CXXFLAGS='-I$(PWD)/build/flatbuffers/include -I$(PWD)/build/abseil-cpp' \
+			LDFLAGS='-L$(PWD)/build/_deps/flatbuffers-build $(ABSL_LD_FLAGS)' \
 			FLATC=$(PWD)/extra-deps/tensorflow-haskell/third_party/tensorflow/bazel-bin/external/flatbuffers/flatc \
 			libedgetpu-throttled \
 			-j$(shell nproc)
