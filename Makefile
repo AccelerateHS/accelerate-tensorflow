@@ -1,5 +1,8 @@
 BAZEL_BIN_DIR := extra-deps/tensorflow-haskell/third_party/tensorflow/bazel-bin
 
+TF_LIB_SO_BASE := $(BAZEL_BIN_DIR)/tensorflow/libtensorflow.so
+TF_LIB_LINKS := $(TF_LIB_SO_BASE) $(TF_LIB_SO_BASE).2 $(TF_LIB_SO_BASE).2.10
+
 .PHONY: all help setup submodules tflitebuild tf-lib-links cabal.project
 
 all: help
@@ -13,7 +16,7 @@ help:
 	@echo "    'tf-lib-links': Additional .so symlinks in bazel bin dir"
 	@echo "    'cabal.project': Creates cabal.project from cabal.project.in (with envsubst)"
 
-setup: submodules tflitebuild tfbuild cabal.project
+setup: submodules tflitebuild tfbuild tf-lib-links cabal.project
 
 submodules:
 	@if git status --porcelain | grep extra-deps >/dev/null; then \
@@ -37,14 +40,11 @@ bazel511:
 	curl -L https://github.com/bazelbuild/bazel/releases/download/5.1.1/bazel-5.1.1-linux-x86_64 >$@
 	chmod +x $@
 
-tf-lib-links: $(BAZEL_BIN_DIR)/tensorflow/libtensorflow.so $(BAZEL_BIN_DIR)/tensorflow/libtensorflow.so.2 $(BAZEL_BIN_DIR)/tensorflow/libtensorflow.so.2.10
+tf-lib-links: $(TF_LIB_LINKS)
 
-$(BAZEL_BIN_DIR)/tensorflow/libtensorflow.so:
-	ln -vs $@.2.10.1 $@
-$(BAZEL_BIN_DIR)/tensorflow/libtensorflow.so.2:
-	ln -vs $@.10.1 $@
-$(BAZEL_BIN_DIR)/tensorflow/libtensorflow.so.2.10:
-	ln -vs $@.1 $@
+$(TF_LIB_LINKS):
+	ln -s libtensorflow.so.2.10.1 $@
+
 
 cabal.project: cabal.project.in
 	envsubst '$$PWD' <$< >$@
