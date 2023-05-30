@@ -4,3 +4,6 @@
 [submodule "extra-deps/accelerate"]
 	path = extra-deps/accelerate
 	url = https://github.com/tmcdonell/accelerate
+[submodule "extra-deps/libedgetpu"]
+	path = extra-deps/libedgetpu
+	url = https://github.com/tomsmeding/libedgetpu

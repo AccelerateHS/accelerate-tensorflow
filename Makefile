@@ -3,7 +3,7 @@ BAZEL_BIN_DIR := extra-deps/tensorflow-haskell/third_party/tensorflow/bazel-bin
 TF_LIB_SO_BASE := $(BAZEL_BIN_DIR)/tensorflow/libtensorflow.so
 TF_LIB_LINKS := $(TF_LIB_SO_BASE) $(TF_LIB_SO_BASE).2 $(TF_LIB_SO_BASE).2.10
 
-.PHONY: all help setup submodules tflitebuild tf-lib-links cabal.project
+.PHONY: all help setup submodules tflitebuild tf-lib-links libedgetpu libedgetpu-lib-links cabal.project
 
 all: help
 
@@ -14,9 +14,11 @@ help:
 	@echo "    'tflitebuild': Builds tensorflow lite inside build/"
 	@echo "    'tfbuild': Builds full tensorflow with bazel"
 	@echo "    'tf-lib-links': Additional .so symlinks in bazel bin dir"
+	@echo "    'libedgetpu': Build libedgetpu.so"
+	@echo "    'libedgetpu-lib-links': Additional .so symlinks in libedgetpu bin dir"
 	@echo "    'cabal.project': Creates cabal.project from cabal.project.in (with envsubst)"
 
-setup: submodules tflitebuild tfbuild tf-lib-links cabal.project
+setup: submodules tflitebuild tfbuild tf-lib-links libedgetpu libedgetpu-lib-links cabal.project
 
 submodules:
 	@if git status --porcelain | grep extra-deps >/dev/null; then \
@@ -45,6 +47,20 @@ tf-lib-links: $(TF_LIB_LINKS)
 $(TF_LIB_LINKS):
 	ln -s libtensorflow.so.2.10.1 $@
 
+libedgetpu:
+	cd extra-deps/libedgetpu && \
+		env TFROOT=$(PWD)/extra-deps/tensorflow-haskell/third_party/tensorflow \
+		make -f makefile_build/Makefile \
+			CXXFLAGS=-I$(PWD)/build/flatbuffers/include \
+			LDFLAGS='-L$(PWD)/build/_deps/flatbuffers-build -L$(PWD)/build/_deps/abseil-cpp-build/absl/flags' \
+			FLATC=$(PWD)/extra-deps/tensorflow-haskell/third_party/tensorflow/bazel-bin/external/flatbuffers/flatc \
+			libedgetpu-throttled \
+			-j$(shell nproc)
+
+libedgetpu-lib-links: extra-deps/libedgetpu/out/throttled/k8/libedgetpu.so
+
+extra-deps/libedgetpu/out/throttled/k8/libedgetpu.so:
+	ln -s libedgetpu.so.1.0 $@
 
 cabal.project: cabal.project.in
 	envsubst '$$PWD' <$< >$@
