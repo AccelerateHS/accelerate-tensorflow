@@ -30,6 +30,8 @@ env LD_LIBRARY_PATH="$ENV" cabal build all
 
 # To run tests:
 env LD_LIBRARY_PATH="$ENV" cabal run nofib-tensorflow-lite
+# Without cabal:
+env LD_LIBRARY_PATH="$ENV" accelerate_tensorflow_lite_datadir="$PWD/accelerate-tensorflow-lite" "$(cabal list-bin nofib-tensorflow-lite)"
 ```
 
 This uses the Tensorflow submodule already contained within the tensorflow-haskell submodule.
