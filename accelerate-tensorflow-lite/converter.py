@@ -50,7 +50,7 @@ def read_int64(f):
     return struct.unpack("q", b)[0]
 
 def read_datatype(f):
-    # NOTE: Must match encoding used by 'tagOfInt'
+    # NOTE: Must match encoding used by 'tagOfType'
     #
     # Using a dictionary here because python doesn't have the standard
     # switch-case construct
