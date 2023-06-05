@@ -74,8 +74,9 @@ BuildEdgeTpuInterpreter
   return interpreter;
 }
 
+// Returns 0 on success, 1 on failure.
 extern "C"
-void
+int64_t
 edgetpu_run
 (
     const char* model_buffer,
@@ -101,6 +102,9 @@ edgetpu_run
   DEBUG("[edgetpu.cc] Building interpreter");
 
   std::unique_ptr<tflite::Interpreter> interpreter = BuildEdgeTpuInterpreter(*model, context.get());
+  if (!interpreter) {
+    return 1;
+  }
 
   // Push the data to each named input tensor
   auto input_tensors = interpreter->inputs();
@@ -125,7 +129,7 @@ edgetpu_run
         }
         if (input_tensor == nullptr) {
           std::cerr << "[edgetpu.cc] Input tensor is NULL for input tensor " << i << " (name '" << input_name << "')" << std::endl;
-          abort();
+          return 1;
         }
         memcpy(input_tensor, tensor_data[j], tensor_size_bytes[j]);
         break;
@@ -162,5 +166,8 @@ edgetpu_run
       }
     }
   }
+
+  return 0;
 }
 
+// vim: set sw=2 ts=2 et:

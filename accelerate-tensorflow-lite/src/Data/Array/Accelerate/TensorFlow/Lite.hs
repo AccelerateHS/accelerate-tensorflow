@@ -185,8 +185,9 @@ execute (Model afunR fun buffer) = eval afunR fun 0 []
       in
       unsafePerformIO $ do
         (aenv', out) <- evalStateT (go outR shOut []) 0
-        B.unsafeUseAsCStringLen buffer $ \(p, n) ->
+        success <- B.unsafeUseAsCStringLen buffer $ \(p, n) ->
           withFeeds (aenv ++ aenv') (edgetpu_run p (fromIntegral n))
+        when (success /= 0) $ error "Error running on Edge TPU"
         return $ toArr out
 
     eval (AfunctionReprLam lamR) (Mlam lhs f) skip aenv = \arr ->
@@ -276,5 +277,5 @@ foreign import ccall "edgetpu_run"
         -> Ptr (Ptr Word8)      -- tensor_data
         -> Ptr Int64            -- tensor_size_bytes
         -> Int64                -- tensor_count
-        -> IO ()
+        -> IO Int64             -- 0 on success
 
