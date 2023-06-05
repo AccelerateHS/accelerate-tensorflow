@@ -13,6 +13,7 @@ with-compiler: ghc-8.10.7
 package accelerate-tensorflow-lite
   extra-include-dirs:
     $PWD/build/flatbuffers/include
+    $PWD/extra-deps/libedgetpu/tflite/public
   extra-lib-dirs:
     $PWD/build
     $PWD/extra-deps/libedgetpu/out/throttled/k8
