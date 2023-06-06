@@ -41,7 +41,7 @@ tflitebuild:
 	cd build && cmake --build . -j
 
 tfbuild: bazel511
-	cd extra-deps/tensorflow-haskell/third_party/tensorflow && ../../../../bazel511 build //tensorflow/tools/pip_package:build_pip_package
+	cd extra-deps/tensorflow-haskell/third_party/tensorflow && ../../../../bazel511 build //tensorflow:all //tensorflow/tools/pip_package:build_pip_package
 	cd extra-deps/tensorflow-haskell/third_party/tensorflow && ../../../../run-with-PATH-dir.sh python=python3 -- bazel-bin/tensorflow/tools/pip_package/build_pip_package ../../../../accelerate-tensorflow-lite/tf-python-venv
 	virtualenv accelerate-tensorflow-lite/tf-python-venv
 	accelerate-tensorflow-lite/tf-python-venv/bin/pip3 install accelerate-tensorflow-lite/tf-python-venv/tensorflow-2.10.1-*.whl
