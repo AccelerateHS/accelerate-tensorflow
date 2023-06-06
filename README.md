@@ -37,8 +37,6 @@ env LD_LIBRARY_PATH="$ENV" accelerate_tensorflow_lite_datadir="$PWD/accelerate-t
 This uses the Tensorflow submodule already contained within the tensorflow-haskell submodule.
 Currently, this is Tensorflow 2.10.1.
 
-TFLite is compiled from the submodule and TF itself is not because TFLite can be compiled using CMake, and TF itself seems to need compilation with Bazel, which is annoying to install and use. Hence we download the required .so from the upstream release for TF itself.
-
 ## Installing the edgetpu library
 
 TODO: Make sure everything in this section is correct; at the moment, the list
