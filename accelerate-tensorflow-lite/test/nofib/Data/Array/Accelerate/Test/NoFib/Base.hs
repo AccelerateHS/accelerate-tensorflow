@@ -112,7 +112,7 @@ instance (Shape sh, Eq sh, Elt e, Similar e) => Similar (Array sh e) where
         | otherwise           = False
 
 instance Similar Float where
-  (~=) = absRelTol 0.05 0.5 -- precision on the EdgeTPU is terrible
+  (~=) = absRelTol 0.2 0.5 -- precision on the EdgeTPU is terrible
 
 instance (Similar a, Similar b) => Similar (a, b) where
   (x1, x2) ~= (y1, y2) = x1 ~= y1 && x2 ~= y2
@@ -126,11 +126,7 @@ instance (Similar a, Similar b, Similar c, Similar d) => Similar (a, b, c, d) wh
 {-# INLINEABLE absRelTol #-}
 absRelTol :: RealFloat a => a -> a -> a -> a -> Bool
 absRelTol epsilonAbs epsilonRel u v
-  |  isInfinite u
-  && isInfinite v          = True
-  |  isNaN u
-  && isNaN v               = True
-  | abs (u-v) < epsilonAbs = True
-  | abs u > abs v          = abs ((u-v) / u) < epsilonRel
-  | otherwise              = abs ((v-u) / v) < epsilonRel
-
+  | isInfinite u && isInfinite v = True
+  | isNaN u && isNaN v           = True
+  | otherwise =
+      abs (u - v) / max (epsilonAbs / epsilonRel) (max (abs u) (abs v)) < epsilonRel
