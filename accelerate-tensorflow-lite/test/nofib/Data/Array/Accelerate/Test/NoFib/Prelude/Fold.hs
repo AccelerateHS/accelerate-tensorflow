@@ -61,13 +61,13 @@ prop_fold
     => (Exp e -> Exp e -> Exp e)
     -> Exp e
     -> Gen (sh :. Int)
-    -> Gen e
+    -> (WhichData -> Gen e)
     -> Property
 prop_fold f z dim e =
   property $ do
     sh  <- forAll dim
     dat <- forAll (generate_sample_data sh e)
-    xs  <- forAll (array sh e)
+    xs  <- forAll (array ForInput sh e)
     let acc  = A.fold f z
         !ref = I.runN acc
         !tpu = TPU.compile acc dat
@@ -78,13 +78,13 @@ prop_fold1
     :: (P.Eq sh, Show sh, Shape sh, A.Num e, Show e, Similar e)
     => (Exp e -> Exp e -> Exp e)
     -> Gen (sh :. Int)
-    -> Gen e
+    -> (WhichData -> Gen e)
     -> Property
 prop_fold1 f dim e =
   property $ do
     sh  <- forAll (dim `except` \sh -> S.size sh P.== 0)
     dat <- forAll (generate_sample_data sh e)
-    xs  <- forAll (array sh e)
+    xs  <- forAll (array ForInput sh e)
     let acc  = A.fold1 f
         !ref = I.runN acc
         !tpu = TPU.compile acc dat
@@ -94,10 +94,10 @@ prop_fold1 f dim e =
 generate_sample_data
   :: (Shape sh, Elt e)
   => (sh :. Int)
-  -> Gen e
+  -> (WhichData -> Gen e)
   -> Gen (RepresentativeData (Array (sh :. Int) e -> Array sh e))
 generate_sample_data (sh :. sz) e = do
   i  <- Gen.int (Range.linear 1 16)
-  xs <- Gen.list (Range.singleton i) (array (sh :. sz) e)
+  xs <- Gen.list (Range.singleton i) (array ForSample (sh :. sz) e)
   return [ x :-> Result sh | x <- xs ]
 

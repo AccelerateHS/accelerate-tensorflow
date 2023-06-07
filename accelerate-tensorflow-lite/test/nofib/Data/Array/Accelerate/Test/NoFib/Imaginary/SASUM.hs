@@ -43,20 +43,20 @@ test_sasum =
     ]
     where
       testElt :: forall e. (A.Num e, Show e, Similar e)
-              => Gen e
+              => (WhichData -> Gen e)
               -> TestTree
       testElt e =
         testProperty (show (eltR @e)) $ prop_sasum e
 
 prop_sasum
     :: (A.Num e, Show e, Similar e)
-    => Gen e
+    => (WhichData -> Gen e)
     -> Property
 prop_sasum e =
   property $ do
     sh  <- forAll dim1
     dat <- forAllWith (const "sample-data") (generate_sample_data_sasum sh e)
-    xs  <- forAll (array sh e)
+    xs  <- forAll (array ForInput sh e)
     let
         sasum = A.fold (+) 0 . A.map abs
         !ref  = I.runN sasum
@@ -67,10 +67,10 @@ prop_sasum e =
 generate_sample_data_sasum
   :: Elt e
   => DIM1
-  -> Gen e
+  -> (WhichData -> Gen e)
   -> Gen (RepresentativeData (Vector e -> Scalar e))
 generate_sample_data_sasum sh e = do
   i  <- Gen.int (Range.linear 1 16)
-  xs <- Gen.list (Range.singleton i) (array sh e)
+  xs <- Gen.list (Range.singleton i) (array ForSample sh e)
   return [ x :-> Result Z | x <- xs ]
 

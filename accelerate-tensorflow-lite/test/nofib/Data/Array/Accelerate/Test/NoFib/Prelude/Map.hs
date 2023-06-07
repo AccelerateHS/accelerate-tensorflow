@@ -52,7 +52,7 @@ test_map =
           [ testProperty "plus1" $ prop_map (+1) dim f32
           , testProperty "sin"   $ prop_map sin dim f32
           , testProperty "cos"   $ prop_map cos dim f32
-          , testProperty "sqrt"  $ prop_map sqrt dim (abs <$> f32)
+          , testProperty "sqrt"  $ prop_map sqrt dim (fmap abs . f32)
           ]
 
 
@@ -60,13 +60,13 @@ prop_map
     :: (P.Eq sh, Show sh, Shape sh, Elt e, Show e, Similar e)
     => (Exp e -> Exp e)
     -> Gen sh
-    -> Gen e
+    -> (WhichData -> Gen e)
     -> Property
 prop_map f dim e =
   property $ do
     sh  <- forAll dim
     dat <- forAll (generate_sample_data sh e)
-    xs  <- forAll (array sh e)
+    xs  <- forAll (array ForInput sh e)
     let !ref = I.runN (A.map f)
         !tpu = TPU.compile (A.map f) dat
     --
@@ -75,10 +75,10 @@ prop_map f dim e =
 generate_sample_data
   :: (Shape sh, Elt e)
   => sh
-  -> Gen e
+  -> (WhichData -> Gen e)
   -> Gen (RepresentativeData (Array sh e -> Array sh e))
 generate_sample_data sh e = do
   i  <- Gen.int (Range.linear 1 16)
-  xs <- Gen.list (Range.singleton i) (array sh e)
+  xs <- Gen.list (Range.singleton i) (array ForSample sh e)
   return [ x :-> Result sh | x <- xs ]
 

@@ -55,12 +55,12 @@ test_generate =
 prop_fill
     :: (P.Eq sh, Show sh, Shape sh, Elt e, Show e, Similar e)
     => Gen sh
-    -> Gen e
+    -> (WhichData -> Gen e)
     -> Property
 prop_fill dim e =
   property $ do
     sh  <- forAll dim
-    x   <- forAll e
+    x   <- forAll (e ForInput)
     dat <- forAllWith (const "sample-data") (generate_sample_data sh e)
     let f    = A.fill (A.constant sh) (A.constant x)
         !ref = I.runN f
@@ -86,7 +86,7 @@ prop_fill dim e =
 generate_sample_data
   :: (Shape sh, Elt e)
   => sh
-  -> Gen e
+  -> (WhichData -> Gen e)
   -> Gen (RepresentativeData (Array sh e))
 generate_sample_data sh _e = do
   Gen.list (Range.linear 1 16) (Gen.constant (Result sh))

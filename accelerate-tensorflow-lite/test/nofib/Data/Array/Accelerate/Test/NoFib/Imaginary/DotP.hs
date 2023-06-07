@@ -45,21 +45,21 @@ test_dotp =
     ]
     where
       testElt :: forall e. (A.Num e, Show e, Similar e)
-              => Gen e
+              => (WhichData -> Gen e)
               -> TestTree
       testElt e =
         testProperty (show (eltR @e)) $ prop_dotp e
 
 prop_dotp
     :: (A.Num e, Show e, Similar e)
-    => Gen e
+    => (WhichData -> Gen e)
     -> Property
 prop_dotp e =
   property $ do
     sh  <- forAll dim1
     dat <- forAllWith (const "sample-data") (generate_sample_data_dotp sh e)
-    xs  <- forAll (array sh e)
-    ys  <- forAll (array sh e)
+    xs  <- forAll (array ForInput sh e)
+    ys  <- forAll (array ForInput sh e)
     let
         dotp = A.sum $$ A.zipWith (*)
         !ref = I.runN dotp
@@ -70,11 +70,11 @@ prop_dotp e =
 generate_sample_data_dotp
   :: Elt e
   => DIM1
-  -> Gen e
+  -> (WhichData -> Gen e)
   -> Gen (RepresentativeData (Vector e -> Vector e -> Scalar e))
 generate_sample_data_dotp sh e = do
   i  <- Gen.int (Range.linear 1 16)
-  xs <- Gen.list (Range.singleton i) (array sh e)
-  ys <- Gen.list (Range.singleton i) (array sh e)
+  xs <- Gen.list (Range.singleton i) (array ForSample sh e)
+  ys <- Gen.list (Range.singleton i) (array ForSample sh e)
   return [ x :-> y :-> Result Z | x <- xs | y <- ys ]
 

@@ -45,22 +45,22 @@ test_saxpy =
     ]
     where
       testElt :: forall e. (P.Eq e, P.Num e, A.Num e, Show e, Similar e)
-              => Gen e
+              => (WhichData -> Gen e)
               -> TestTree
       testElt e =
         testProperty (show (eltR @e)) $ prop_saxpy e
 
 prop_saxpy
     :: (P.Eq e, P.Num e, A.Num e, Show e, Similar e)
-    => Gen e
+    => (WhichData -> Gen e)
     -> Property
 prop_saxpy e =
   property $ do
     sh  <- forAll dim1
     dat <- forAllWith (const "sample-data") (generate_sample_data_saxpy sh e)
-    α   <- forAll (e `except` \v -> v P.== 0) -- otherwise the xs node is pruned and conversion to TFLite fails
-    xs  <- forAll (array sh e)
-    ys  <- forAll (array sh e)
+    α   <- forAll (e ForInput `except` \v -> v P.== 0) -- otherwise the xs node is pruned and conversion to TFLite fails
+    xs  <- forAll (array ForInput sh e)
+    ys  <- forAll (array ForInput sh e)
     let
         saxpy = A.zipWith (\x y -> constant α * x + y)
         !ref  = I.runN saxpy
@@ -71,11 +71,11 @@ prop_saxpy e =
 generate_sample_data_saxpy
   :: Elt e
   => DIM1
-  -> Gen e
+  -> (WhichData -> Gen e)
   -> Gen (RepresentativeData (Vector e -> Vector e -> Vector e))
 generate_sample_data_saxpy sh e = do
   i  <- Gen.int (Range.linear 1 16)
-  xs <- Gen.list (Range.singleton i) (array sh e)
-  ys <- Gen.list (Range.singleton i) (array sh e)
+  xs <- Gen.list (Range.singleton i) (array ForSample sh e)
+  ys <- Gen.list (Range.singleton i) (array ForSample sh e)
   return [ x :-> y :-> Result sh | x <- xs | y <- ys ]
 

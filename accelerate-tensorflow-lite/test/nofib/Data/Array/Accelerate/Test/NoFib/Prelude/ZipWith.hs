@@ -62,14 +62,14 @@ prop_zipWith
     :: (P.Eq sh, Show sh, Shape sh, Elt e, Show e, Similar e)
     => (Exp e -> Exp e -> Exp e)
     -> Gen sh
-    -> Gen e
+    -> (WhichData -> Gen e)
     -> Property
 prop_zipWith f dim e =
   property $ do
     sh  <- forAll dim
     dat <- forAllWith (const "sample-data") (generate_sample_data sh e)
-    xs  <- forAll (array sh e)
-    ys  <- forAll (array sh e)
+    xs  <- forAll (array ForInput sh e)
+    ys  <- forAll (array ForInput sh e)
     let !ref = I.runN (A.zipWith f)
         !tpu = TPU.compile (A.zipWith f) dat
     --
@@ -78,11 +78,11 @@ prop_zipWith f dim e =
 generate_sample_data
   :: (Shape sh, Elt e)
   => sh
-  -> Gen e
+  -> (WhichData -> Gen e)
   -> Gen (RepresentativeData (Array sh e -> Array sh e -> Array sh e))
 generate_sample_data sh e = do
   i  <- Gen.int (Range.linear 1 16)
-  xs <- Gen.list (Range.singleton i) (array sh e)
-  ys <- Gen.list (Range.singleton i) (array sh e)
+  xs <- Gen.list (Range.singleton i) (array ForSample sh e)
+  ys <- Gen.list (Range.singleton i) (array ForSample sh e)
   return [ x :-> y :-> Result sh | x <- xs | y <- ys ]
 

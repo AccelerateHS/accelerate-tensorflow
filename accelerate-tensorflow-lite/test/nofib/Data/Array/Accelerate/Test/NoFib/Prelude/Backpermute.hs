@@ -49,13 +49,13 @@ test_backpermute =
 
 prop_transpose
     :: (Elt e, Show e, Similar e)
-    => Gen e
+    => (WhichData -> Gen e)
     -> Property
 prop_transpose e =
   property $ do
     sh  <- forAll dim2
     dat <- forAllWith (const "sample-data") (generate_sample_data_transpose sh e)
-    xs  <- forAll (array sh e)
+    xs  <- forAll (array ForInput sh e)
     let !ref = I.runN A.transpose
         !tpu = TPU.compile A.transpose dat
     --
@@ -64,10 +64,10 @@ prop_transpose e =
 generate_sample_data_transpose
   :: Elt e
   => DIM2
-  -> Gen e
+  -> (WhichData -> Gen e)
   -> Gen (RepresentativeData (Array DIM2 e -> Array DIM2 e))
 generate_sample_data_transpose sh@(Z :. h :. w) e = do
   i  <- Gen.int (Range.linear 1 16)
-  xs <- Gen.list (Range.singleton i) (array sh e)
+  xs <- Gen.list (Range.singleton i) (array ForSample sh e)
   return [ x :-> Result (Z :. w :. h) | x <- xs ]
 
