@@ -19,6 +19,20 @@ Accelerate, refer to the [main repository](https://github.com/AccelerateHS/accel
 Contributions and bug reports are welcome!<br>
 Please feel free to contact me through [GitHub](https://github.com/AccelerateHS/accelerate) or [gitter.im](https://gitter.im/AccelerateHS/Lobby).
 
+## Dependencies
+
+Many things are built from source in this repository, either because we need to apply some patches or because we need somewhat different transitive dependency versions than the upstream pre-compiled download has.
+Still, a few things need to be installed on the system.
+
+1. From the [Coral apt repository](https://coral.ai/software/#debian-packages), get the `edgetpu_compiler` package.
+   (The other edgetpu libraries are either not needed or compiled from source here.)
+
+2. **TODO: is protoc required?**
+   To build the required TensorFlow and TensorFlow-haskell packages, you need to have protoc installed.
+   If you do not have it installed, follow the directions on [this webpage](https://google.github.io/proto-lens/installing-protoc.html).
+   (The Ubuntu package name is `protobuf-compiler`.)
+
+
 ## Compiling using Cabal
 
 ```sh
@@ -36,32 +50,3 @@ env LD_LIBRARY_PATH="$ENV" accelerate_tensorflow_lite_datadir="$PWD/accelerate-t
 
 This uses the Tensorflow submodule already contained within the tensorflow-haskell submodule.
 Currently, this is Tensorflow 2.10.1.
-
-## Installing the edgetpu library
-
-TODO: Make sure everything in this section is correct; at the moment, the list
-of what to install might be incomplete.
-TODO: non-debian Linux instructions.
-Follow the instructions from [Coral](https://coral.ai/software/#debian-packages) to get access to their debian packages through apt(-get). Then, install the following libraries:
- - libedgetpu-dev (TODO: check necessity, probably required)
- - edgetpu\_compiler
- - libedgetpu1-std (recommended unless the higher frequency is required)
-
-## TODO check if this is still required
-
-### Installing protoc
-
-To build the required TensorFlow and TensorFlow-haskell packages, you need to
-have protoc installed. If you do not have it installed, follow the directions on
-[this webpage](https://google.github.io/proto-lens/installing-protoc.html).
-
-### Installing other dependencies
-
-Other dependencies have to be installed manually before running `stack build`.
-Among these are cpuinfo, farmhash. (TODO: find out what exactly is on this
-list.) These exist in the Ubuntu package management system and can be installed
-through apt:
-```bash
-sudo apt install libcpuinfo-dev libfarmhash-dev
-```
-
