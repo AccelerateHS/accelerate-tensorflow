@@ -1,6 +1,9 @@
-{-# LANGUAGE GADTs               #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE GADTs                #-}
+{-# LANGUAGE ScopedTypeVariables  #-}
+{-# LANGUAGE StandaloneDeriving   #-}
+{-# LANGUAGE TypeApplications     #-}
+{-# LANGUAGE TypeFamilies         #-}
+{-# LANGUAGE UndecidableInstances #-}
 -- |
 -- Module      : Data.Array.Accelerate.TensorFlow.Lite.Sugar.Args
 -- Copyright   : [2021..2022] The Accelerate Team
@@ -50,6 +53,15 @@ infixr 0 :->
 data Args f where
   (:->)  :: Arrays a => a -> Args b -> Args (a -> b)
   Result :: HasShapes a => Shapes a -> Args a
+
+type family AllShowFun f where
+  AllShowFun (a -> b) = (Show a, AllShowFun b)
+  AllShowFun b = ()
+
+instance AllShowFun f => Show (Args f) where
+  showsPrec d (x :-> as) = showParen (d > 0) $
+    showsPrec 1 x . showString " :-> " . showsPrec 0 as
+  showsPrec _ (Result _) = showString "<shapes>"
 
 fromArgs :: AfunctionRepr f (AfunctionR f) (ArraysFunctionR f)
          -> Args (AfunctionR f)

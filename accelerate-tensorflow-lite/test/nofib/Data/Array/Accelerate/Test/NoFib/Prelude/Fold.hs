@@ -66,7 +66,7 @@ prop_fold
 prop_fold f z dim e =
   property $ do
     sh  <- forAll dim
-    dat <- forAllWith (const "sample-data") (generate_sample_data sh e)
+    dat <- forAll (generate_sample_data sh e)
     xs  <- forAll (array sh e)
     let acc  = A.fold f z
         !ref = I.runN acc
@@ -83,7 +83,7 @@ prop_fold1
 prop_fold1 f dim e =
   property $ do
     sh  <- forAll (dim `except` \sh -> S.size sh P.== 0)
-    dat <- forAllWith (const "sample-data") (generate_sample_data sh e)
+    dat <- forAll (generate_sample_data sh e)
     xs  <- forAll (array sh e)
     let acc  = A.fold1 f
         !ref = I.runN acc

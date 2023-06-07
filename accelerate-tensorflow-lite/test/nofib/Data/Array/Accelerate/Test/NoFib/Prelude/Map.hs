@@ -65,7 +65,7 @@ prop_map
 prop_map f dim e =
   property $ do
     sh  <- forAll dim
-    dat <- forAllWith (const "sample-data") (generate_sample_data sh e)
+    dat <- forAll (generate_sample_data sh e)
     xs  <- forAll (array sh e)
     let !ref = I.runN (A.map f)
         !tpu = TPU.compile (A.map f) dat
