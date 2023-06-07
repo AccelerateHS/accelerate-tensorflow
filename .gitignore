@@ -3,6 +3,9 @@ dist-newstyle/
 *~
 /stack.yaml.lock
 
+# C language server cache directory
+.ccls-cache/
+
 # Tensorflow build directory
 build/
 
