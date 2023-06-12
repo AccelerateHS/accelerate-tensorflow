@@ -67,7 +67,7 @@ generate_sample_data_transpose
   -> (WhichData -> Gen e)
   -> Gen (RepresentativeData (Array DIM2 e -> Array DIM2 e))
 generate_sample_data_transpose sh@(Z :. h :. w) e = do
-  i  <- Gen.int (Range.linear 1 16)
+  i  <- Gen.int (Range.linear 10 16)
   xs <- Gen.list (Range.singleton i) (array ForSample sh e)
   return [ x :-> Result (Z :. w :. h) | x <- xs ]
 

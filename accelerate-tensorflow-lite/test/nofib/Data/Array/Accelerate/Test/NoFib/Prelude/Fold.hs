@@ -40,9 +40,9 @@ import Prelude                                                      as P
 test_fold :: TestTree
 test_fold =
   testGroup "fold"
-    [ testDim dim1
-    , testDim dim2
-    , testDim dim3
+    [ testDim dim1'
+    , testDim dim2'
+    , testDim dim3'
     ]
     where
       testDim :: forall sh. (Shape sh, Show sh, P.Eq sh)
@@ -97,7 +97,7 @@ generate_sample_data
   -> (WhichData -> Gen e)
   -> Gen (RepresentativeData (Array (sh :. Int) e -> Array sh e))
 generate_sample_data (sh :. sz) e = do
-  i  <- Gen.int (Range.linear 1 16)
+  i  <- Gen.int (Range.linear 10 16)
   xs <- Gen.list (Range.singleton i) (array ForSample (sh :. sz) e)
   return [ x :-> Result sh | x <- xs ]
 

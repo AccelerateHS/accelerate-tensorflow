@@ -55,7 +55,7 @@ prop_sasum
 prop_sasum e =
   property $ do
     sh  <- forAll dim1
-    dat <- forAllWith (const "sample-data") (generate_sample_data_sasum sh e)
+    dat <- forAll (generate_sample_data_sasum sh e)
     xs  <- forAll (array ForInput sh e)
     let
         sasum = A.fold (+) 0 . A.map abs
@@ -70,7 +70,7 @@ generate_sample_data_sasum
   -> (WhichData -> Gen e)
   -> Gen (RepresentativeData (Vector e -> Scalar e))
 generate_sample_data_sasum sh e = do
-  i  <- Gen.int (Range.linear 1 16)
+  i  <- Gen.int (Range.linear 10 16)
   xs <- Gen.list (Range.singleton i) (array ForSample sh e)
   return [ x :-> Result Z | x <- xs ]
 

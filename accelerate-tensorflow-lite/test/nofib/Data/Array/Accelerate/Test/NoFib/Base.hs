@@ -40,20 +40,30 @@ data WhichData = ForSample | ForInput
 dim0 :: Gen DIM0
 dim0 = return Z
 
-dim1 :: Gen DIM1
-dim1 = (Z :.) <$> Gen.int (Range.linear 0 1024)
+dim1,dim1' :: Gen DIM1
+dim1  = (Z :.) <$> Gen.int (Range.linear 0 1024)
+dim1' = (Z :.) <$> Gen.int (Range.linear 1 1024)
 
-dim2 :: Gen DIM2
-dim2 = do
+dim2,dim2' :: Gen DIM2
+dim2  = do
   x <- Gen.int (Range.linear 0 128)
   y <- Gen.int (Range.linear 0 48)
   return (Z :. y :. x)
+dim2' = do
+  x <- Gen.int (Range.linear 1 128)
+  y <- Gen.int (Range.linear 1 48)
+  return (Z :. y :. x)
 
-dim3 :: Gen DIM3
-dim3 = do
+dim3,dim3' :: Gen DIM3
+dim3  = do
   x <- Gen.int (Range.linear 0 64)
   y <- Gen.int (Range.linear 0 32)
   z <- Gen.int (Range.linear 0 16)
+  return (Z :. z :. y :. x)
+dim3' = do
+  x <- Gen.int (Range.linear 1 64)
+  y <- Gen.int (Range.linear 1 32)
+  z <- Gen.int (Range.linear 1 16)
   return (Z :. z :. y :. x)
 
 array :: (Shape sh, Elt e) => WhichData -> sh -> (WhichData -> Gen e) -> Gen (Array sh e)

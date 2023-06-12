@@ -89,5 +89,5 @@ generate_sample_data
   -> (WhichData -> Gen e)
   -> Gen (RepresentativeData (Array sh e))
 generate_sample_data sh _e = do
-  Gen.list (Range.linear 1 16) (Gen.constant (Result sh))
+  Gen.list (Range.linear 10 16) (Gen.constant (Result sh))
 
