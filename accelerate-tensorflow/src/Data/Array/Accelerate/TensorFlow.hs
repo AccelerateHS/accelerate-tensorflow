@@ -41,8 +41,8 @@ import qualified Data.Array.Accelerate.Representation.Shape         as R
 
 import Data.Array.Accelerate.TensorFlow.CodeGen
 import Data.Array.Accelerate.TensorFlow.CodeGen.AST
-import Data.Array.Accelerate.TensorFlow.CodeGen.Base
 import Data.Array.Accelerate.TensorFlow.CodeGen.Tensor
+import Data.Array.Accelerate.TensorFlow.TypeDicts
 
 import qualified TensorFlow.Core                                    as TF
 import qualified TensorFlow.Tensor                                  as TF
@@ -113,39 +113,11 @@ runN acc =
 
                   array :: TypeR t -> ArrayData t -> State Int [TF.Feed]
                   array TupRunit         ()     = return []
-                  array (TupRsingle aR)  a      = return <$> scalar aR a
+                  array (TupRsingle aR)  a      = return <$> buildTypeDictsScalar aR feed a
                   array (TupRpair aR bR) (a, b) = do
                     a' <- array aR a
                     b' <- array bR b
                     return (a' ++ b')
-
-                  scalar :: ScalarType t -> ArrayData t -> State Int TF.Feed
-                  scalar (SingleScalarType t) = single t
-                  scalar (VectorScalarType _) = unsupported "SIMD-vector types"
-
-                  single :: SingleType t -> ArrayData t -> State Int TF.Feed
-                  single (NumSingleType t) = num t
-
-                  num :: NumType t -> ArrayData t -> State Int TF.Feed
-                  num (IntegralNumType t) = integral t
-                  num (FloatingNumType t) = floating t
-
-                  integral :: IntegralType t -> ArrayData t -> State Int TF.Feed
-                  integral TypeInt8   = feed
-                  integral TypeInt16  = feed
-                  integral TypeInt32  = feed
-                  integral TypeInt64  = feed
-                  integral TypeWord8  = feed
-                  integral TypeWord16 = feed
-                  integral TypeWord32 = feed
-                  integral TypeWord64 = feed
-                  integral TypeInt    = feed
-                  integral TypeWord   = feed
-
-                  floating :: FloatingType t -> ArrayData t -> State Int TF.Feed
-                  floating TypeFloat  = feed
-                  floating TypeDouble = feed
-                  floating TypeHalf   = unsupported "half-precision floating point"
 
                   feed :: forall t s. (Storable t, TF.TensorType s, s ~ ScalarTensorDataR t) => UniqueArray t -> State Int TF.Feed
                   feed ua = state $ \j ->

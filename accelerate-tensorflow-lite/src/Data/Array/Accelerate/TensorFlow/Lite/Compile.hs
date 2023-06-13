@@ -16,14 +16,13 @@ module Data.Array.Accelerate.TensorFlow.Lite.Compile (
 
 ) where
 
-import Data.Array.Accelerate.Type
 import Data.Array.Accelerate.Representation.Array
 import Data.Array.Accelerate.Representation.Type
 import qualified Data.Array.Accelerate.Debug.Internal               as Debug
 
 import Data.Array.Accelerate.TensorFlow.CodeGen.AST
-import Data.Array.Accelerate.TensorFlow.CodeGen.Base
 import Data.Array.Accelerate.TensorFlow.CodeGen.Tensor
+import Data.Array.Accelerate.TensorFlow.TypeDicts
 
 import Data.Array.Accelerate.TensorFlow.Lite.Representation.Args
 
@@ -168,35 +167,7 @@ graph_of_model (Tbody arrR model) =
       array :: TF.MonadBuild m => TypeR t -> TensorArrayData t -> m ()
       array TupRunit         ()     = return ()
       array (TupRpair aR bR) (a, b) = array aR a >> array bR b
-      array (TupRsingle aR)  a      = scalar aR a
-
-      scalar :: TF.MonadBuild m => ScalarType t -> TensorArrayData t -> m ()
-      scalar (SingleScalarType t) = single t
-      scalar (VectorScalarType _) = unsupported "SIMD-vector types"
-
-      single :: TF.MonadBuild m => SingleType t -> TensorArrayData t -> m ()
-      single (NumSingleType t) = num t
-
-      num :: TF.MonadBuild m => NumType t -> TensorArrayData t -> m ()
-      num (IntegralNumType t) = integral t
-      num (FloatingNumType t) = floating t
-
-      integral :: TF.MonadBuild m => IntegralType t -> TensorArrayData t -> m ()
-      integral TypeInt8   = render
-      integral TypeInt16  = render
-      integral TypeInt32  = render
-      integral TypeInt64  = render
-      integral TypeWord8  = render
-      integral TypeWord16 = render
-      integral TypeWord32 = render
-      integral TypeWord64 = render
-      integral TypeInt    = render
-      integral TypeWord   = render
-
-      floating :: TF.MonadBuild m => FloatingType t -> TensorArrayData t -> m ()
-      floating TypeFloat  = render
-      floating TypeDouble = render
-      floating TypeHalf   = unsupported "half-precision floating point"
+      array (TupRsingle aR)  a      = buildTypeDictsScalar aR render a
 
       render :: TF.MonadBuild m => TF.Tensor TF.Build a -> m ()
       render t = TF.render t >> return ()

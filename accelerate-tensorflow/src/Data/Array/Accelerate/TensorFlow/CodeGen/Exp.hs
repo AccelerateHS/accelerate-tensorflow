@@ -20,6 +20,7 @@ import Data.Array.Accelerate.TensorFlow.CodeGen.Arithmetic          as A
 import Data.Array.Accelerate.TensorFlow.CodeGen.Base
 import Data.Array.Accelerate.TensorFlow.CodeGen.Environment
 import Data.Array.Accelerate.TensorFlow.CodeGen.Tensor
+import Data.Array.Accelerate.TensorFlow.TypeDicts
 
 import Data.Array.Accelerate.AST
 import Data.Array.Accelerate.AST.Var
@@ -55,35 +56,7 @@ buildOpenExp contextR context env aenv =
             go :: TypeR s -> TensorArrayData s -> TensorArrayData s
             go TupRunit         ()     = ()
             go (TupRpair aR bR) (a, b) = (go aR a, go bR b)
-            go (TupRsingle aR)  a      = scalar aR a
-
-            scalar :: ScalarType s -> TensorArrayData s -> TensorArrayData s
-            scalar (SingleScalarType t) = single t
-            scalar (VectorScalarType _) = unsupported "vector types"
-
-            single :: SingleType s -> TensorArrayData s -> TensorArrayData s
-            single (NumSingleType t) = num t
-
-            num :: NumType s -> TensorArrayData s -> TensorArrayData s
-            num (IntegralNumType t) = integral t
-            num (FloatingNumType t) = floating t
-
-            integral :: IntegralType s -> TensorArrayData s -> TensorArrayData s
-            integral TypeInt8   = TF.fill sh_
-            integral TypeInt16  = TF.fill sh_
-            integral TypeInt32  = TF.fill sh_
-            integral TypeInt64  = TF.fill sh_
-            integral TypeWord8  = TF.fill sh_
-            integral TypeWord16 = TF.fill sh_
-            integral TypeWord32 = TF.fill sh_
-            integral TypeWord64 = TF.fill sh_
-            integral TypeInt    = TF.fill sh_
-            integral TypeWord   = TF.fill sh_
-
-            floating :: FloatingType s -> TensorArrayData s -> TensorArrayData s
-            floating TypeFloat  = TF.fill sh_
-            floating TypeDouble = TF.fill sh_
-            floating TypeHalf   = unsupported "half-precision floating point"
+            go (TupRsingle aR)  a      = buildTypeDictsScalar aR (TF.fill sh_) a
         in
         go
 
@@ -99,35 +72,7 @@ buildOpenExp contextR context env aenv =
             go :: TypeR s -> TensorArrayData s -> TensorArrayData s -> TensorArrayData s
             go TupRunit         ()       ()       = ()
             go (TupRpair tA tB) (a1, b1) (a2, b2) = (go tA a1 a2, go tB b1 b2)
-            go (TupRsingle eR)  a        b        = scalar eR a b
-
-            scalar :: ScalarType s -> TensorArrayData s -> TensorArrayData s -> TensorArrayData s
-            scalar (SingleScalarType s) = single s
-            scalar (VectorScalarType _) = unsupported "SIMD-vector types"
-
-            single :: SingleType s -> TensorArrayData s -> TensorArrayData s -> TensorArrayData s
-            single (NumSingleType s) = num s
-
-            num :: NumType s -> TensorArrayData s -> TensorArrayData s -> TensorArrayData s
-            num (IntegralNumType s) = integral s
-            num (FloatingNumType s) = floating s
-
-            integral :: IntegralType s -> TensorArrayData s -> TensorArrayData s -> TensorArrayData s
-            integral TypeInt    = TF.selectV2 p'
-            integral TypeInt8   = TF.selectV2 p'
-            integral TypeInt16  = TF.selectV2 p'
-            integral TypeInt32  = TF.selectV2 p'
-            integral TypeInt64  = TF.selectV2 p'
-            integral TypeWord   = TF.selectV2 p'
-            integral TypeWord8  = TF.selectV2 p'
-            integral TypeWord16 = TF.selectV2 p'
-            integral TypeWord32 = TF.selectV2 p'
-            integral TypeWord64 = TF.selectV2 p'
-
-            floating :: FloatingType s -> TensorArrayData s -> TensorArrayData s -> TensorArrayData s
-            floating TypeFloat  = TF.selectV2 p'
-            floating TypeDouble = TF.selectV2 p'
-            floating TypeHalf   = unsupported "half-precision floating point"
+            go (TupRsingle eR)  a        b        = buildTypeDictsScalar eR (TF.selectV2 p') a b
         in
         go (expType t) t' e'
 
@@ -201,38 +146,8 @@ constant
     -> t
     -> TensorArrayData t
 constant shR eR sh =
-  let
-      sh_ = shapeToTensor shR sh
-
-      scalar :: ScalarType t -> t -> TensorArrayData t
-      scalar (SingleScalarType t) = single t
-      scalar (VectorScalarType _) = unsupported "vector types"
-
-      single :: SingleType t -> t -> TensorArrayData t
-      single (NumSingleType t) = num t
-
-      num :: NumType t -> t -> TensorArrayData t
-      num (IntegralNumType t) = integral t
-      num (FloatingNumType t) = floating t
-
-      integral :: IntegralType t -> t -> TensorArrayData t
-      integral TypeInt8   = TF.fill sh_ . TF.scalar
-      integral TypeInt16  = TF.fill sh_ . TF.scalar
-      integral TypeInt32  = TF.fill sh_ . TF.scalar
-      integral TypeInt64  = TF.fill sh_ . TF.scalar
-      integral TypeWord8  = TF.fill sh_ . TF.scalar
-      integral TypeWord16 = TF.fill sh_ . TF.scalar
-      integral TypeWord32 = TF.fill sh_ . TF.scalar
-      integral TypeWord64 = TF.fill sh_ . TF.scalar
-      integral TypeInt    = TF.fill sh_ . TF.scalar . P.fromIntegral
-      integral TypeWord   = TF.fill sh_ . TF.scalar . P.fromIntegral
-
-      floating :: FloatingType t -> t -> TensorArrayData t
-      floating TypeFloat  = TF.fill sh_ . TF.scalar
-      floating TypeDouble = TF.fill sh_ . TF.scalar
-      floating TypeHalf   = unsupported "half-precision floating point"
-  in
-  scalar eR
+  let sh_ = shapeToTensor shR sh
+  in buildTypeDictsScalar eR (TF.fill sh_ . TF.scalar . convertConvertable)
 
 primFun
     :: forall a b.

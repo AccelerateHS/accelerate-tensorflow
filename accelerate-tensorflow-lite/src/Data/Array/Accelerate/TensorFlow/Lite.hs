@@ -41,7 +41,7 @@ import Data.Array.Accelerate.Type
 import qualified Data.Array.Accelerate.Representation.Array                   as R
 import qualified Data.Array.Accelerate.Smart                                  as Smart
 
-import Data.Array.Accelerate.TensorFlow.CodeGen.Base
+import Data.Array.Accelerate.TensorFlow.TypeDicts
 
 import Data.Array.Accelerate.TensorFlow.Lite.CodeGen
 import Data.Array.Accelerate.TensorFlow.Lite.Compile
@@ -140,36 +140,8 @@ execute (Model afunR fun buffer) = eval afunR fun 0 []
             let
                 array :: TypeR t -> ArrayData t -> State Int [Feed]
                 array TupRunit         ()     = return []
-                array (TupRsingle aR)  a      = return <$> scalar aR a
+                array (TupRsingle aR)  a      = return <$> buildTypeDictsScalar aR feed a
                 array (TupRpair aR bR) (a, b) = (++) <$> array aR a <*> array bR b
-
-                scalar :: ScalarType t -> ArrayData t -> State Int Feed
-                scalar (SingleScalarType t) = single t
-                scalar (VectorScalarType _) = unsupported "SIMD-vector types"
-
-                single :: SingleType t -> ArrayData t -> State Int Feed
-                single (NumSingleType t) = num t
-
-                num :: NumType t -> ArrayData t -> State Int Feed
-                num (IntegralNumType t) = integral t
-                num (FloatingNumType t) = floating t
-
-                integral :: IntegralType t -> ArrayData t -> State Int Feed
-                integral TypeInt8   = feed
-                integral TypeInt16  = feed
-                integral TypeInt32  = feed
-                integral TypeInt64  = feed
-                integral TypeWord8  = feed
-                integral TypeWord16 = feed
-                integral TypeWord32 = feed
-                integral TypeWord64 = feed
-                integral TypeInt    = feed
-                integral TypeWord   = feed
-
-                floating :: FloatingType t -> ArrayData t -> State Int Feed
-                floating TypeFloat  = feed
-                floating TypeDouble = feed
-                floating TypeHalf   = unsupported "half-precision floating point"
 
                 feed :: forall t. (Storable t, IsScalar t) => UniqueArray t -> State Int Feed
                 feed ua = state $ \j ->
@@ -201,39 +173,11 @@ execute (Model afunR fun buffer) = eval afunR fun 0 []
 
                 array :: TypeR t -> ArrayData t -> State Int [Feed]
                 array TupRunit         ()     = return []
-                array (TupRsingle aR)  a      = return <$> scalar aR a
+                array (TupRsingle aR)  a      = return <$> buildTypeDictsScalar aR feed a
                 array (TupRpair aR bR) (a, b) = do
                   a' <- array aR a
                   b' <- array bR b
                   return (a' ++ b')
-
-                scalar :: ScalarType t -> ArrayData t -> State Int Feed
-                scalar (SingleScalarType t) = single t
-                scalar (VectorScalarType _) = unsupported "SIMD-vector types"
-
-                single :: SingleType t -> ArrayData t -> State Int Feed
-                single (NumSingleType t) = num t
-
-                num :: NumType t -> ArrayData t -> State Int Feed
-                num (IntegralNumType t) = integral t
-                num (FloatingNumType t) = floating t
-
-                integral :: IntegralType t -> ArrayData t -> State Int Feed
-                integral TypeInt8   = feed
-                integral TypeInt16  = feed
-                integral TypeInt32  = feed
-                integral TypeInt64  = feed
-                integral TypeWord8  = feed
-                integral TypeWord16 = feed
-                integral TypeWord32 = feed
-                integral TypeWord64 = feed
-                integral TypeInt    = feed
-                integral TypeWord   = feed
-
-                floating :: FloatingType t -> ArrayData t -> State Int Feed
-                floating TypeFloat  = feed
-                floating TypeDouble = feed
-                floating TypeHalf   = unsupported "half-precision floating point"
 
                 feed :: forall t. (Storable t, IsScalar t) => UniqueArray t -> State Int Feed
                 feed ua = state $ \j ->
