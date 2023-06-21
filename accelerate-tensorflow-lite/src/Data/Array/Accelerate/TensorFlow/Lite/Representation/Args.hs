@@ -20,6 +20,7 @@ module Data.Array.Accelerate.TensorFlow.Lite.Representation.Args
   where
 
 import Data.Array.Accelerate.TensorFlow.CodeGen.Base
+import Data.Array.Accelerate.TensorFlow.TypeDicts
 import Data.Array.Accelerate.TensorFlow.Lite.Representation.Shapes
 
 import Data.Array.Accelerate.Array.Data
@@ -77,35 +78,7 @@ buildArgs args =
                 buildArrayData :: TypeR e -> ArrayData e -> Builder
                 buildArrayData TupRunit         ()     = mempty
                 buildArrayData (TupRpair aR bR) (a, b) = buildArrayData aR a <> buildArrayData bR b
-                buildArrayData (TupRsingle aR)  a      = B.word8 (tagOfType aR) <> scalar aR a
-
-                scalar :: ScalarType a -> ArrayData a -> Builder
-                scalar (SingleScalarType t) = single t
-                scalar (VectorScalarType _) = unsupported "SIMD-vector types"
-
-                single :: SingleType a -> ArrayData a -> Builder
-                single (NumSingleType t) = num t
-
-                num :: NumType a -> ArrayData a -> Builder
-                num (IntegralNumType t) = integral t
-                num (FloatingNumType t) = floating t
-
-                integral :: IntegralType a -> ArrayData a -> Builder
-                integral TypeInt8   = wrap
-                integral TypeInt16  = wrap
-                integral TypeInt32  = wrap
-                integral TypeInt64  = wrap
-                integral TypeWord8  = wrap
-                integral TypeWord16 = wrap
-                integral TypeWord32 = wrap
-                integral TypeWord64 = wrap
-                integral TypeInt    = wrap
-                integral TypeWord   = wrap
-
-                floating :: FloatingType a -> ArrayData a -> Builder
-                floating TypeHalf   = wrap
-                floating TypeFloat  = wrap
-                floating TypeDouble = wrap
+                buildArrayData (TupRsingle aR)  a      = B.word8 (tagOfType aR) <> buildTypeDictsScalar aR wrap a
 
                 wrap :: forall a. Storable a => UniqueArray a -> Builder
                 wrap (unsafeGetValue . uniqueArrayData -> fp)

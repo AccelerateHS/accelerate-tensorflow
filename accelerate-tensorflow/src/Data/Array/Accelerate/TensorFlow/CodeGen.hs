@@ -31,6 +31,7 @@ import Data.Array.Accelerate.TensorFlow.CodeGen.Environment
 import Data.Array.Accelerate.TensorFlow.CodeGen.Exp
 import Data.Array.Accelerate.TensorFlow.CodeGen.Foreign
 import Data.Array.Accelerate.TensorFlow.CodeGen.Tensor
+import Data.Array.Accelerate.TensorFlow.TypeDicts
 
 import Data.Array.Accelerate.AST
 import Data.Array.Accelerate.AST.Environment                        ( weakenEmpty )
@@ -98,36 +99,8 @@ buildOpenAfun aenv (Alam lhs f) = do
             array :: TypeR t -> State Int (TensorArrayData t)
             array TupRunit         = return ()
             array (TupRpair aR bR) = (,) <$> array aR <*> array bR
-            array (TupRsingle aR)  = scalar aR
+            array (TupRsingle aR)  = buildTypeDictsScalar aR placeholder
               where
-                scalar :: ScalarType t -> State Int (TensorArrayData t)
-                scalar (SingleScalarType t) = single t
-                scalar (VectorScalarType _) = unsupported "SIMD-vector types"
-
-                single :: SingleType t -> State Int (TensorArrayData t)
-                single (NumSingleType t) = num t
-
-                num :: NumType t -> State Int (TensorArrayData t)
-                num (IntegralNumType t) = integral t
-                num (FloatingNumType t) = floating t
-
-                integral :: IntegralType t -> State Int (TensorArrayData t)
-                integral TypeInt8   = placeholder
-                integral TypeInt16  = placeholder
-                integral TypeInt32  = placeholder
-                integral TypeInt64  = placeholder
-                integral TypeWord8  = placeholder
-                integral TypeWord16 = placeholder
-                integral TypeWord32 = placeholder
-                integral TypeWord64 = placeholder
-                integral TypeInt    = placeholder
-                integral TypeWord   = placeholder
-
-                floating :: FloatingType t -> State Int (TensorArrayData t)
-                floating TypeFloat  = placeholder
-                floating TypeDouble = placeholder
-                floating TypeHalf   = unsupported "half-precision floating point"
-
                 placeholder :: TF.TensorType t => State Int (TF.Tensor TF.Build t)
                 placeholder = state $ \j -> (TF.placeholder' (TF.opName .~ TF.explicitName (T.pack (printf "input%d_adata%d" i j))), j+1)
         in
@@ -157,35 +130,7 @@ buildOpenAfun aenv (Abody f) =
             array :: TypeR t -> TensorArrayData t -> State Int (TensorArrayData t)
             array TupRunit         ()     = return ()
             array (TupRpair aR bR) (a, b) = (,) <$> array aR a <*> array bR b
-            array (TupRsingle aR)  a      = scalar aR a
-
-            scalar :: ScalarType t -> TensorArrayData t -> State Int (TensorArrayData t)
-            scalar (SingleScalarType t) = single t
-            scalar (VectorScalarType _) = unsupported "SIMD-vector types"
-
-            single :: SingleType t -> TensorArrayData t -> State Int (TensorArrayData t)
-            single (NumSingleType t) = num t
-
-            num :: NumType t -> TensorArrayData t -> State Int (TensorArrayData t)
-            num (IntegralNumType t) = integral t
-            num (FloatingNumType t) = floating t
-
-            integral :: IntegralType t -> TensorArrayData t -> State Int (TensorArrayData t)
-            integral TypeInt8   = label
-            integral TypeInt16  = label
-            integral TypeInt32  = label
-            integral TypeInt64  = label
-            integral TypeWord8  = label
-            integral TypeWord16 = label
-            integral TypeWord32 = label
-            integral TypeWord64 = label
-            integral TypeInt    = label
-            integral TypeWord   = label
-
-            floating :: FloatingType t -> TensorArrayData t -> State Int (TensorArrayData t)
-            floating TypeFloat  = label
-            floating TypeDouble = label
-            floating TypeHalf   = unsupported "half-precision floating point"
+            array (TupRsingle aR)  a      = buildTypeDictsScalar aR label a
 
             label :: TF.TensorType t => TF.Tensor TF.Build t -> State Int (TF.Tensor TF.Build t)
             label t = state $ \j -> (TF.identity' (TF.opName .~ TF.explicitName (T.pack (printf "output%d_adata%d" i j))) t, j+1)
@@ -223,10 +168,10 @@ buildOpenAcc aenv (OpenAcc pacc) =
             shape ShapeRz         ()     = ()
             shape (ShapeRsnoc tR) (t, h) = (shape tR t, TF.constant (TF.Shape [1]) [fromIntegral h])
 
-            array :: TypeR t -> ArrayData t -> TensorArrayData t
+            array :: forall t'. TypeR t' -> ArrayData t' -> TensorArrayData t'
             array TupRunit ()             = ()
             array (TupRpair aR bR) (a, b) = (array aR a, array bR b)
-            array (TupRsingle aR) a       = scalar aR a
+            array (TupRsingle aR) a       = buildTypeDictsScalar aR tensor a
               where
                 tensor :: forall s t. (Storable t, s ~ ScalarTensorDataR t, TF.TensorType s)
                        => UniqueArray t
@@ -242,34 +187,6 @@ buildOpenAcc aenv (OpenAcc pacc) =
                            & TF.tensorContent .~ values
                   in
                   TF.const' (TF.opAttr "value" .~ node)
-
-                scalar :: ScalarType t -> ArrayData t -> TensorArrayData t
-                scalar (SingleScalarType t) = single t
-                scalar (VectorScalarType _) = unsupported "SIMD-vector types"
-
-                single :: SingleType t -> ArrayData t -> TensorArrayData t
-                single (NumSingleType t) = num t
-
-                num :: NumType t -> ArrayData t -> TensorArrayData t
-                num (IntegralNumType t) = integral t
-                num (FloatingNumType t) = floating t
-
-                integral :: IntegralType t -> ArrayData t -> TensorArrayData t
-                integral TypeInt8   = tensor
-                integral TypeInt16  = tensor
-                integral TypeInt32  = tensor
-                integral TypeInt64  = tensor
-                integral TypeWord8  = tensor
-                integral TypeWord16 = tensor
-                integral TypeWord32 = tensor
-                integral TypeWord64 = tensor
-                integral TypeInt    = tensor
-                integral TypeWord   = tensor
-
-                floating :: FloatingType t -> ArrayData t -> TensorArrayData t
-                floating TypeFloat  = tensor
-                floating TypeDouble = tensor
-                floating TypeHalf   = unsupported "half-precision floating point"
 
             adata' = array adataR adata
             sh'    = shape shR sh
@@ -345,37 +262,7 @@ buildOpenAcc aenv (OpenAcc pacc) =
             array :: TypeR s -> TensorArrayData s -> TensorArrayData s
             array TupRunit         ()     = ()
             array (TupRpair aR bR) (a, b) = (array aR a, array bR b)
-            array (TupRsingle aR)  a      =
-              let
-                  scalar :: ScalarType s -> TensorArrayData s -> TensorArrayData s
-                  scalar (SingleScalarType t) = single t
-                  scalar (VectorScalarType _) = unsupported "vector types"
-
-                  single :: SingleType s -> TensorArrayData s -> TensorArrayData s
-                  single (NumSingleType t) = num t
-
-                  num :: NumType s -> TensorArrayData s -> TensorArrayData s
-                  num (IntegralNumType t) = integral t
-                  num (FloatingNumType t) = floating t
-
-                  integral :: IntegralType s -> TensorArrayData s -> TensorArrayData s
-                  integral TypeInt8   s = TF.tile (TF.reshape s sl_) sh_
-                  integral TypeInt16  s = TF.tile (TF.reshape s sl_) sh_
-                  integral TypeInt32  s = TF.tile (TF.reshape s sl_) sh_
-                  integral TypeInt64  s = TF.tile (TF.reshape s sl_) sh_
-                  integral TypeWord8  s = TF.tile (TF.reshape s sl_) sh_
-                  integral TypeWord16 s = TF.tile (TF.reshape s sl_) sh_
-                  integral TypeWord32 s = TF.tile (TF.reshape s sl_) sh_
-                  integral TypeWord64 s = TF.tile (TF.reshape s sl_) sh_
-                  integral TypeInt    s = TF.tile (TF.reshape s sl_) sh_
-                  integral TypeWord   s = TF.tile (TF.reshape s sl_) sh_
-
-                  floating :: FloatingType s -> TensorArrayData s -> TensorArrayData s
-                  floating TypeFloat  s = TF.tile (TF.reshape s sl_) sh_
-                  floating TypeDouble s = TF.tile (TF.reshape s sl_) sh_
-                  floating TypeHalf   _ = unsupported "half-precision floating point"
-              in
-              scalar aR a
+            array (TupRsingle aR)  a      = buildTypeDictsScalar aR (\s -> TF.tile (TF.reshape s sl_) sh_) a
         in
         Tensor (ArrayR shR eR) sh' (array eR e')
 
@@ -421,37 +308,7 @@ buildOpenAcc aenv (OpenAcc pacc) =
             array :: TypeR t -> TensorArrayData t -> TensorArrayData t
             array TupRunit        () = ()
             array TupRpair{}      _  = unsupported "sum: product types"
-            array (TupRsingle aR) a  =
-              let
-                  scalar :: ScalarType t -> TensorArrayData t -> TensorArrayData t
-                  scalar (SingleScalarType t) = single t
-                  scalar (VectorScalarType _) = unsupported "SIMD-vector types"
-
-                  single :: SingleType t -> TensorArrayData t -> TensorArrayData t
-                  single (NumSingleType t) = num t
-
-                  num :: NumType t -> TensorArrayData t -> TensorArrayData t
-                  num (IntegralNumType t) = integral t
-                  num (FloatingNumType t) = floating t
-
-                  integral :: IntegralType t -> TensorArrayData t -> TensorArrayData t
-                  integral TypeInt8   x = reduce x (TF.scalar @Int32 0)
-                  integral TypeInt16  x = reduce x (TF.scalar @Int32 0)
-                  integral TypeInt32  x = reduce x (TF.scalar @Int32 0)
-                  integral TypeInt64  x = reduce x (TF.scalar @Int32 0)
-                  integral TypeWord8  x = reduce x (TF.scalar @Int32 0)
-                  integral TypeWord16 x = reduce x (TF.scalar @Int32 0)
-                  integral TypeWord32 x = reduce x (TF.scalar @Int32 0)
-                  integral TypeWord64 x = reduce x (TF.scalar @Int32 0)
-                  integral TypeInt    x = reduce x (TF.scalar @Int32 0)
-                  integral TypeWord   x = reduce x (TF.scalar @Int32 0)
-
-                  floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t
-                  floating TypeFloat  x = reduce x (TF.scalar @Int32 0)
-                  floating TypeDouble x = reduce x (TF.scalar @Int32 0)
-                  floating TypeHalf   _ = unsupported "half-precision floating point"
-              in
-              scalar aR a
+            array (TupRsingle aR) a  = buildTypeDictsScalar aR (\x -> reduce x (TF.scalar @Int32 0)) a
         in
         Tensor (ArrayR shR' eR) sh' (array eR xs')
 
@@ -501,37 +358,7 @@ buildOpenAcc aenv (OpenAcc pacc) =
             array :: TypeR t -> TensorArrayData t -> TensorArrayData t
             array TupRunit         ()     = ()
             array (TupRpair aR bR) (a, b) = (array aR a, array bR b)
-            array (TupRsingle aR)  a      =
-              let
-                  scalar :: ScalarType t -> TensorArrayData t -> TensorArrayData t
-                  scalar (SingleScalarType t) = single t
-                  scalar (VectorScalarType _) = unsupported "SIMD-vector types"
-
-                  single :: SingleType t -> TensorArrayData t -> TensorArrayData t
-                  single (NumSingleType t) = num t
-
-                  num :: NumType t -> TensorArrayData t -> TensorArrayData t
-                  num (IntegralNumType t) = integral t
-                  num (FloatingNumType t) = floating t
-
-                  integral :: IntegralType t -> TensorArrayData t -> TensorArrayData t
-                  integral TypeInt8   x = TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])
-                  integral TypeInt16  x = TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])
-                  integral TypeInt32  x = TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])
-                  integral TypeInt64  x = TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])
-                  integral TypeWord8  x = TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])
-                  integral TypeWord16 x = TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])
-                  integral TypeWord32 x = TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])
-                  integral TypeWord64 x = TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])
-                  integral TypeInt    x = TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])
-                  integral TypeWord   x = TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])
-
-                  floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t
-                  floating TypeFloat  x = TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])
-                  floating TypeDouble x = TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])
-                  floating TypeHalf   _ = unsupported "half-precision floating point"
-              in
-              scalar aR a
+            array (TupRsingle aR)  a      = buildTypeDictsScalar aR (\x -> TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])) a
         in
         Tensor (ArrayR shR eR) (((), w), h) (array eR xs)
 

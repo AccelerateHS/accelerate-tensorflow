@@ -66,19 +66,22 @@ type family TArrayDataR ba a where
   TArrayDataR ba (a, b) = (TArrayDataR ba a, TArrayDataR ba b)
   TArrayDataR ba a      = ba (ScalarTensorDataR a)
 
+type HostEquivalentInt  = $( case finiteBitSize (undefined :: Int) of
+                               32 -> [t| Int32 |]
+                               64 -> [t| Int64 |]
+                               _  -> error "expected 32- or 64-bit integer type" )
+type HostEquivalentWord = $( case finiteBitSize (undefined :: Word) of
+                               32 -> [t| Word32 |]
+                               64 -> [t| Word64 |]
+                               _  -> error "expected 32- or 64-bit unsigned integer type" )
+
 type family ScalarTensorDataR t where
-  ScalarTensorDataR Int       = $( case finiteBitSize (undefined :: Int) of
-                                     32 -> [t| Int32 |]
-                                     64 -> [t| Int64 |]
-                                     _  -> error "expected 32- or 64-bit integer type" )
+  ScalarTensorDataR Int       = HostEquivalentInt
   ScalarTensorDataR Int8      = Int8
   ScalarTensorDataR Int16     = Int16
   ScalarTensorDataR Int32     = Int32
   ScalarTensorDataR Int64     = Int64
-  ScalarTensorDataR Word      = $( case finiteBitSize (undefined :: Word) of
-                                     32 -> [t| Word32 |]
-                                     64 -> [t| Word64 |]
-                                     _  -> error "expected 32- or 64-bit unsigned integer type" )
+  ScalarTensorDataR Word      = HostEquivalentWord
   ScalarTensorDataR Word8     = Word8
   ScalarTensorDataR Word16    = Word16
   ScalarTensorDataR Word32    = Word32

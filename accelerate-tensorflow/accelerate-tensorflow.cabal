@@ -35,6 +35,7 @@ library
       Data.Array.Accelerate.TensorFlow.CodeGen.Exp
       Data.Array.Accelerate.TensorFlow.CodeGen.Foreign
       Data.Array.Accelerate.TensorFlow.CodeGen.Tensor
+      Data.Array.Accelerate.TensorFlow.TypeDicts
   other-modules:
       Paths_accelerate_tensorflow
   hs-source-dirs:
