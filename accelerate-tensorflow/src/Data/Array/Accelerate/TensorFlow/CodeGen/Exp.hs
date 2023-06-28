@@ -136,31 +136,75 @@ buildOpenExp contextR context env aenv =
 
       shapeSizeL :: ShapeR sh -> TensorArrayData sh -> TensorArrayData Int
       shapeSizeL = shapeToTensor
+
+
+      gatherL :: Tensor sh e -> TensorArrayData Int -> TensorArrayData e
+      gatherL (Tensor (ArrayR shr t) sh p) ix = case t of
+        TupRsingle t -> scalar t p ix
+        TupRunit -> ()
+        TupRpair tl tr -> let (pl, pr) = p in ( gatherL (Tensor (ArrayR shr tl) sh pl) ix
+                                              , gatherL (Tensor (ArrayR shr tr) sh pr) ix)
+        where
+          scalar :: ScalarType s -> TensorArrayData s -> TensorArrayData Int -> TensorArrayData s
+          scalar (SingleScalarType s) = single s
+          scalar (VectorScalarType _) = unsupported "SIMD-vector types"
+
+          single :: SingleType s -> TensorArrayData s -> TensorArrayData Int -> TensorArrayData s
+          single (NumSingleType s) = num s
+
+          num :: NumType s -> TensorArrayData s -> TensorArrayData Int -> TensorArrayData s
+          num (IntegralNumType s) = integral s
+          num (FloatingNumType s) = floating s
+
+          integral :: IntegralType s -> TensorArrayData s -> TensorArrayData Int -> TensorArrayData s
+          integral TypeInt    = TF.gather
+          integral TypeInt8   = TF.gather
+          integral TypeInt16  = TF.gather
+          integral TypeInt32  = TF.gather
+          integral TypeInt64  = TF.gather
+          integral TypeWord   = TF.gather
+          integral TypeWord8  = TF.gather
+          integral TypeWord16 = TF.gather
+          integral TypeWord32 = TF.gather
+          integral TypeWord64 = TF.gather
+
+          floating :: FloatingType s -> TensorArrayData s -> TensorArrayData Int -> TensorArrayData s
+          floating TypeFloat  = TF.gather
+          floating TypeDouble = TF.gather
+          floating TypeHalf   = unsupported "half-precision floating point"
   in
   \case
     Let lhs bnd body              -> buildOpenExp contextR context (env `push` (lhs, buildE bnd)) aenv body
     Evar (Var _ ix)               -> prj ix env
-    -- Foreign tR asm f x            -> undefined
     Pair x y                      -> (buildE x, buildE y)
     Nil                           -> ()
     VecPack{}                     -> unsupported "SIMD-vector types"
     VecUnpack{}                   -> unsupported "SIMD-vector types"
-    -- IndexSlice sliceIndex slix sh -> undefined
-    -- IndexFull sliceIndex slix sl  -> undefined
-    -- ToIndex shR sh ix             -> undefined
-    -- FromIndex shR sh i            -> undefined
-    -- Case tag xs x                 -> undefined
+    ToIndex shR sh ix             -> let
+        go :: ShapeR sh -> TensorArrayData sh -> TensorArrayData sh -> TensorArrayData Int
+        go ShapeRz _ _ = 0
+        go (ShapeRsnoc shr) (sh,n) (ix,i) = i + n * go shr sh ix
+      in go shR (buildE sh) (buildE ix)
+    FromIndex shR sh i            -> let
+        go :: ShapeR sh -> TensorArrayData sh -> TensorArrayData Int -> TensorArrayData sh
+        go ShapeRz _ _ = ()
+        go (ShapeRsnoc shr) (sh,n) i = (go shr sh (A.rem TypeInt64 (i, n)), A.quot TypeInt64 (i, n))
+      in go shR (buildE sh) (buildE i)
     Cond p t e                    -> condL p t e
-    -- While p f x                   -> undefined
     Const tR c                    -> constant contextR tR context c
     PrimConst x                   -> primConst contextR context x
     PrimApp f x                   -> primFun f (buildE x)
-    -- Index v ix                    -> undefined
-    -- LinearIndex v ix              -> undefined
+    Index v@(Var (ArrayR shr _) _) ix       -> buildE (LinearIndex v $ ToIndex shr (Shape v) ix)
+    LinearIndex (Var (ArrayR _ t) arrIx) ix -> gatherL (aprj arrIx aenv) (buildE ix)
     Shape (Var _ ix)              -> shapeL (aprj ix aenv)
     ShapeSize shR sh              -> shapeSizeL shR (buildE sh)
-    -- Undef t                       -> undefined
-    -- Coerce tA tB a                -> undefined
+    Foreign tR asm f x            -> unsupported "Exp: Foreign"
+    IndexSlice sliceIndex slix sh -> unsupported "Exp: IndexSlice"
+    IndexFull sliceIndex slix sl  -> unsupported "Exp: IndexFull"
+    Case tag xs x                 -> unsupported "Exp: Case"
+    While p f x                   -> unsupported "Exp: While"
+    Undef t                       -> unsupported "Exp: Undef"
+    Coerce tA tB a                -> unsupported "Exp: Coerce"
 
 
 shapeToTensor

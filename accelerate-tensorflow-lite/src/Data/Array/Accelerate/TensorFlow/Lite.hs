@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances        #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE GADTs                    #-}
+{-# LANGUAGE FlexibleContexts          #-}
 {-# LANGUAGE RecordWildCards          #-}
 {-# LANGUAGE ScopedTypeVariables      #-}
 {-# LANGUAGE TypeApplications         #-}
@@ -24,6 +25,8 @@ module Data.Array.Accelerate.TensorFlow.Lite (
   compile,
   execute,
 
+  argMin, argMax
+
 ) where
 
 import Data.Array.Accelerate.AST                                              as AST
@@ -40,8 +43,10 @@ import Data.Array.Accelerate.Trafo.Simplify
 import Data.Array.Accelerate.Type
 import qualified Data.Array.Accelerate.Representation.Array                   as R
 import qualified Data.Array.Accelerate.Smart                                  as Smart
-
+import qualified Data.Array.Accelerate.TensorFlow.CodeGen.AST
 import Data.Array.Accelerate.TensorFlow.CodeGen.Base
+
+import Data.Array.Accelerate.TensorFlow
 
 import Data.Array.Accelerate.TensorFlow.Lite.CodeGen
 import Data.Array.Accelerate.TensorFlow.Lite.Compile

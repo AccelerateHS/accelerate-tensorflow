@@ -7,6 +7,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE TypeOperators       #-}
 -- |
 -- Module      : Data.Array.Accelerate.TensorFlow
 -- Copyright   : [2021] The Accelerate Team
@@ -22,9 +23,12 @@ module Data.Array.Accelerate.TensorFlow (
   run,
   runN,
 
+  argMin, argMax
+
 ) where
 
-import Data.Array.Accelerate                                        ( Acc )
+import Data.Array.Accelerate                                        as A hiding ((++), reverse, fromIntegral)
+import qualified Data.Array.Accelerate                              as A
 import Data.Array.Accelerate.AST                                    ( ALeftHandSide )
 import Data.Array.Accelerate.AST.LeftHandSide
 import Data.Array.Accelerate.Array.Data
@@ -33,6 +37,7 @@ import Data.Array.Accelerate.Lifetime
 import Data.Array.Accelerate.Representation.Type
 import Data.Array.Accelerate.Representation.Shape
 import Data.Array.Accelerate.Sugar.Array                            ( Arrays(..), ArraysR(..) )
+import Data.Array.Accelerate.Sugar.Elt
 import Data.Array.Accelerate.Trafo.Sharing
 import Data.Array.Accelerate.Trafo.Simplify
 import Data.Array.Accelerate.Type
@@ -43,10 +48,13 @@ import Data.Array.Accelerate.TensorFlow.CodeGen
 import Data.Array.Accelerate.TensorFlow.CodeGen.AST
 import Data.Array.Accelerate.TensorFlow.CodeGen.Base
 import Data.Array.Accelerate.TensorFlow.CodeGen.Tensor
+import Data.Array.Accelerate.TensorFlow.CodeGen.Foreign
 
 import qualified TensorFlow.Core                                    as TF
+import qualified TensorFlow.GenOps.Core                             as TF
 import qualified TensorFlow.Tensor                                  as TF
 import qualified TensorFlow.Types                                   as TF
+import qualified TensorFlow.Ops                                     as TF
 import qualified TensorFlow.Internal.FFI                            as Internal
 
 import Control.Monad.State
@@ -179,4 +187,23 @@ fetchableDictR (TupRpair aR bR)
   | FetchableDict <- fetchableDictR aR
   , FetchableDict <- fetchableDictR bR
   = FetchableDict
+
+argMinMax :: (A.Ord a, Shape sh) => MinMax -> Acc (Array (sh :. Int) a) -> Acc (Array sh (Int32, a))
+argMinMax minMax xs = let ys = argMinMax' xs
+                        in A.imap (\ix y -> T2 y (xs A.! (ix ::. (A.fromIntegral y)))) ys
+  where
+    argMinMax' :: (Shape sh, A.Ord a) => Acc (Array (sh :. Int) a) -> Acc (Array sh Int32)
+    argMinMax' = foreignAcc
+      (ForeignAcc "argminmax" $ tpuArgMinMax minMax) --TPU
+      (   A.map (\(T2 (_ ::. i) _) -> A.fromIntegral i) 
+        . fold1 (\(T2 a x) (T2 b y) -> A.ifThenElse (x `minOrMax` y) (T2 a x) (T2 b y))
+        . imap T2) -- fallback (interpreter/CPU/GPU)
+    minOrMax :: A.Ord a => Exp a -> Exp a -> Exp Bool
+    minOrMax = case minMax of
+      Min -> (A.<)
+      Max -> (A.>)
+
+argMin, argMax :: (A.Ord a, Shape sh) => Acc (Array (sh :. Int) a) -> Acc (Array sh (Int32, a))
+argMin = argMinMax Min
+argMax = argMinMax Max
 

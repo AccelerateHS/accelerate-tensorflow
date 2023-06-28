@@ -16,6 +16,7 @@ import Data.Array.Accelerate.Test.NoFib.Prelude.Fold
 import Data.Array.Accelerate.Test.NoFib.Prelude.Generate
 import Data.Array.Accelerate.Test.NoFib.Prelude.Map
 import Data.Array.Accelerate.Test.NoFib.Prelude.ZipWith
+import Data.Array.Accelerate.Test.NoFib.Prelude.Foreign
 
 import Test.Tasty
 
@@ -28,5 +29,6 @@ test_prelude =
     , test_fold
     , test_backpermute
     , test_generate
+    , test_foreign
     ]
 
