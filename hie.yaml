@@ -1,0 +1,16 @@
+cradle:
+  cabal:
+    - path: "./accelerate-tensorflow/src"
+      component: "accelerate-tensorflow:lib:accelerate-tensorflow"
+    - path: "./accelerate-tensorflow/test/nofib"
+      component: "accelerate-tensorflow:test:nofib-tensorflow"
+    - path: "./accelerate-tensorflow-lite/src"
+      component: "accelerate-tensorflow-lite:lib:accelerate-tensorflow-lite"
+    - path: "./accelerate-tensorflow-lite/test/nofib"
+      component: "accelerate-tensorflow-lite:test:nofib-tensorflow-lite"
+    - path: "./extra-deps/accelerate/src"
+      component: "accelerate:lib:accelerate"
+    - path: "./extra-deps/accelerate/test/doctest"
+      component: "accelerate:test:doctest"
+    - path: "./extra-deps/accelerate/test/nofib"
+      component: "accelerate:test:nofib-interpreter"
