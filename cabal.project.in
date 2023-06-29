@@ -23,5 +23,9 @@ package tensorflow
     $PWD/lib-links
     $PWD/extra-deps/tensorflow-haskell/third_party/tensorflow/bazel-bin/tensorflow
 
-package accelerate
-  flags: +nofib
+-- accelerate:+nofib is necessary to build the test suite of
+-- accelerate-tensorflow. Note that accelerate-tensorflow-lite has its own test
+-- suite and does not need this flag.
+
+-- package accelerate
+--   flags: +nofib
