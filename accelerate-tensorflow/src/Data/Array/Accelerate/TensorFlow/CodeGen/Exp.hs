@@ -294,20 +294,13 @@ primFun f =
     PrimQuot t              -> A.quot t
     PrimRem t               -> A.rem t
     PrimQuotRem t           -> A.quotRem t
-    -- PrimIDiv     :: IntegralType a -> PrimFun ((a, a)   -> a)
-    -- PrimMod      :: IntegralType a -> PrimFun ((a, a)   -> a)
-    -- PrimDivMod   :: IntegralType a -> PrimFun ((a, a)   -> (a, a))
     PrimBAnd t              -> A.band t
     PrimBOr t               -> A.bor t
     PrimBXor t              -> A.xor t
     PrimBNot t              -> A.complement t
     PrimBShiftL t           -> A.shiftL t
     PrimBShiftR t           -> A.shiftR t
-    -- PrimBRotateL           :: IntegralType a -> PrimFun ((a, Int) -> a)
-    -- PrimBRotateR           :: IntegralType a -> PrimFun ((a, Int) -> a)
     PrimPopCount t          -> A.popCount t
-    -- PrimCountLeadingZeros  :: IntegralType a -> PrimFun (a -> Int)
-    -- PrimCountTrailingZeros :: IntegralType a -> PrimFun (a -> Int)
     PrimFDiv t              -> A.fdiv t
     PrimRecip t             -> A.recip t
     PrimSin t               -> A.sin t
@@ -348,3 +341,10 @@ primFun f =
     PrimFromIntegral ta tb  -> A.fromIntegral ta tb
     PrimToFloating ta tb    -> A.toFloating ta tb
 
+    PrimIDiv{}                -> unsupported "PrimIDiv" -- :: IntegralType a -> PrimFun ((a, a)   -> a)
+    PrimMod{}                 -> unsupported "PrimMod" -- :: IntegralType a -> PrimFun ((a, a)   -> a)
+    PrimDivMod{}              -> unsupported "PrimDivMod" -- :: IntegralType a -> PrimFun ((a, a)   -> (a, a))
+    PrimBRotateL{}            -> unsupported "PrimBRotateL"           -- :: IntegralType a -> PrimFun ((a, Int) -> a)
+    PrimBRotateR{}            -> unsupported "PrimBRotateR"           -- :: IntegralType a -> PrimFun ((a, Int) -> a)
+    PrimCountTrailingZeros{}  -> unsupported "PrimCountTrailingZeros"           -- :: IntegralType a -> PrimFun (a -> Int)
+    PrimCountLeadingZeros{}   -> unsupported "PrimCountLeadingZeros"           -- :: IntegralType a -> PrimFun (a -> Int)

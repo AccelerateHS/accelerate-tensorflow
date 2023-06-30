@@ -94,8 +94,9 @@ type RepresentativeData f = [Args f]
 -- The compiled model can then be evaluated using 'execute' or serialised
 -- using 'encodeModel'.
 --
-compile :: forall f. Afunction f => f -> RepresentativeData (AfunctionR f) -> Model (AfunctionR f)
-compile acc args = unsafePerformIO $ Model afunR (modelAfun afunR tfun x) <$> compileTfunWith tfun (x:xs)
+compile :: forall f. (Afunction f) => f -> RepresentativeData (AfunctionR f) -> Model (AfunctionR f)
+compile acc args = unsafePerformIO $ do
+  Model afunR (modelAfun afunR tfun x) <$> compileTfunWith tfun (x:xs)
   where
     !afunR = afunctionRepr @f
     !afun  = simplifyAfun (convertAfun acc)

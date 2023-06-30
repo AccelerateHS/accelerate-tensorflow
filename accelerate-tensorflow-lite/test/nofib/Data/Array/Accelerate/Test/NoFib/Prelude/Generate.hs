@@ -49,7 +49,9 @@ test_generate =
               -> TestTree
       testDim dim =
         testGroup ("DIM" P.++ show (rank @sh))
-          [ testProperty "fill" $ prop_fill dim f32
+          [ testProperty "fill16" $ prop_fill dim i16
+          , testProperty "fill8" $ prop_fill dim i8
+          , testProperty "mod19" $ prop_mod19 dim int
           ]
 
 prop_fill
@@ -67,6 +69,24 @@ prop_fill dim e =
         !tpu = TPU.compile f dat
     --
     TPU.execute tpu ~~~ ref
+
+prop_mod19
+    :: (P.Eq sh, Show sh, Shape sh)
+    => Gen sh
+    -> (WhichData -> Gen Int)
+    -> Property
+prop_mod19 dim e =
+  property $ do
+    sh  <- forAll dim
+    x   <- forAll (e ForInput)
+    dat <- forAllWith (const "sample-data") (generate_sample_data sh e)
+    let f    = A.generate (A.constant sh) (\ix -> A.toIndex (A.constant sh) ix `A.rem` A.constant 19)
+        !ref = I.runN f
+        !tpu = TPU.compile f dat
+    --
+    TPU.execute tpu ~~~ ref
+
+
 
 -- prop_generate
 --     :: (P.Eq sh, Show sh, Shape sh, Elt e, Show e, Similar e)

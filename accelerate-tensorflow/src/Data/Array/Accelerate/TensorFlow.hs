@@ -188,6 +188,7 @@ fetchableDictR (TupRpair aR bR)
   , FetchableDict <- fetchableDictR bR
   = FetchableDict
 
+-- TODO: put the fallback implementation in Accelerate's Prelude as "argMin" and "argMax", and export "argMinTPU","argMaxTPU" with ForeignAcc from here
 argMinMax :: (A.Ord a, Shape sh) => MinMax -> Acc (Array (sh :. Int) a) -> Acc (Array sh (Int32, a))
 argMinMax minMax xs = let ys = argMinMax' xs
                         in A.imap (\ix y -> T2 y (xs A.! (ix ::. (A.fromIntegral y)))) ys

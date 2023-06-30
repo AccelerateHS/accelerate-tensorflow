@@ -74,6 +74,21 @@ array wd sh gen = fromList sh <$> Gen.list (Range.singleton (size sh)) (gen wd)
 f32 :: WhichData -> Gen Float
 f32 ForSample = Gen.float (Range.constantFrom 0 (-1) 1)
 f32 ForInput = Gen.float (Range.linearFracFrom 0 (-1) 1)
+int :: WhichData -> Gen Int
+int ForSample = Gen.int (Range.constantFrom 0 (-100) 100)
+int ForInput  = Gen.int (Range.linearFrom 0 (-50) 50)
+i64 :: WhichData -> Gen Int64
+i64 ForSample = Gen.int64 (Range.constantFrom 0 (-100) 100)
+i64 ForInput  = Gen.int64 (Range.linearFrom 0 (-50) 50)
+i32 :: WhichData -> Gen Int32
+i32 ForSample = Gen.int32 (Range.constantFrom 0 (-100) 100)
+i32 ForInput  = Gen.int32 (Range.linearFrom 0 (-50) 50)
+i16 :: WhichData -> Gen Int16
+i16 ForSample = Gen.int16 (Range.constantFrom 0 (-100) 100)
+i16 ForInput  = Gen.int16 (Range.linearFrom 0 (-50) 50)
+i8  :: WhichData -> Gen Int8
+i8  ForSample = Gen.int8 (Range.constantFrom 0 (-100) 100)
+i8  ForInput  = Gen.int8 (Range.linearFrom 0 (-50) 50)
 
 except :: Gen e -> (e -> Bool) -> Gen e
 except gen f  = do
@@ -110,7 +125,10 @@ infix 4 ~=
 
 instance Similar Z
 instance Similar Int
+instance Similar Int8
+instance Similar Int16
 instance Similar Int32
+instance Similar Int64
 instance (Eq sh, Eq sz) => Similar (sh:.sz)
 
 instance (Shape sh, Eq sh, Elt e, Similar e) => Similar (Array sh e) where

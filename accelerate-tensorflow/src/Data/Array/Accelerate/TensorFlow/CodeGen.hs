@@ -33,9 +33,10 @@ import Data.Array.Accelerate.TensorFlow.CodeGen.Environment
 import Data.Array.Accelerate.TensorFlow.CodeGen.Exp
 import Data.Array.Accelerate.TensorFlow.CodeGen.Foreign
 import Data.Array.Accelerate.TensorFlow.CodeGen.Tensor
-
+import Data.Array.Accelerate.Pretty ()
+import Data.Array.Accelerate.Trafo.Var
 import Data.Array.Accelerate.AST
-import Data.Array.Accelerate.AST.Environment                        ( weakenEmpty )
+import Data.Array.Accelerate.AST.Environment                        ( weakenEmpty, weakenSucc, weakenId )
 import Data.Array.Accelerate.AST.Idx
 import Data.Array.Accelerate.AST.LeftHandSide
 import Data.Array.Accelerate.AST.Var
@@ -506,10 +507,15 @@ buildOpenAcc aenv (OpenAcc pacc) =
           -- backpermute
           --   (indexSlice (I2 0 All_) (shape a0))
           --   (\(x0) -> indexFull (I2 0 All_) (x0))
-
-        -- alternatve: We have Generate now, can use it and gather for catch-all general-purpose backpermute
-        | otherwise
-        = unsupported "backpermute"
+        -- catch-all, inefficient version
+        | arr@(ArrayR shR eR) <- arrayR acc
+        , DeclareVars lhs w k <- declareVars (shapeType shR)
+        = buildA 
+          $ OpenAcc $ Alet (LeftHandSideSingle arr) acc 
+          $ OpenAcc $ Map eR (Lam lhs $ Body $ Index (Var arr ZeroIdx) (expVars $ k weakenId))
+          $ OpenAcc $ Generate (ArrayR shR' (shapeType shR)) 
+                        (weaken (weakenSucc weakenId) sh')
+                        (weaken (weakenSucc weakenId) p)
 
       transposeL
           :: OpenAcc aenv (Array DIM2 e)
