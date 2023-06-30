@@ -74,7 +74,7 @@ generate_sample_data_saxpy
   -> (WhichData -> Gen e)
   -> Gen (RepresentativeData (Vector e -> Vector e -> Vector e))
 generate_sample_data_saxpy sh e = do
-  i  <- Gen.int (Range.linear 1 16)
+  i  <- Gen.int (Range.linear 10 16)
   xs <- Gen.list (Range.singleton i) (array ForSample sh e)
   ys <- Gen.list (Range.singleton i) (array ForSample sh e)
   return [ x :-> y :-> Result sh | x <- xs | y <- ys ]

@@ -49,7 +49,7 @@ test_map =
               -> TestTree
       testDim dim =
         testGroup ("DIM" P.++ show (rank @sh))
-          [ testProperty "plus1" $ prop_map (+1) dim f32
+          [ testProperty "rem" $ prop_map (+1) dim i32
           , testProperty "sin"   $ prop_map sin dim f32
           , testProperty "cos"   $ prop_map cos dim f32
           , testProperty "sqrt"  $ prop_map sqrt dim (fmap abs . f32)
@@ -78,7 +78,7 @@ generate_sample_data
   -> (WhichData -> Gen e)
   -> Gen (RepresentativeData (Array sh e -> Array sh e))
 generate_sample_data sh e = do
-  i  <- Gen.int (Range.linear 1 16)
+  i  <- Gen.int (Range.linear 10 16)
   xs <- Gen.list (Range.singleton i) (array ForSample sh e)
   return [ x :-> Result sh | x <- xs ]
 

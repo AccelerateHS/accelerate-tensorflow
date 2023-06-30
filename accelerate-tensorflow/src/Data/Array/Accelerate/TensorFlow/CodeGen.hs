@@ -21,7 +21,9 @@
 module Data.Array.Accelerate.TensorFlow.CodeGen (
 
   buildAcc, buildOpenAcc,
-  buildAfun,
+  buildAfun, 
+  
+  tpuArgMinMax, MinMax(..)
 
 ) where
 
@@ -33,8 +35,10 @@ import Data.Array.Accelerate.TensorFlow.CodeGen.Foreign
 import Data.Array.Accelerate.TensorFlow.CodeGen.Tensor
 import Data.Array.Accelerate.TensorFlow.TypeDicts
 
+import Data.Array.Accelerate.Pretty ()
+import Data.Array.Accelerate.Trafo.Var
 import Data.Array.Accelerate.AST
-import Data.Array.Accelerate.AST.Environment                        ( weakenEmpty )
+import Data.Array.Accelerate.AST.Environment                        ( weakenEmpty, weakenSucc, weakenId )
 import Data.Array.Accelerate.AST.Idx
 import Data.Array.Accelerate.AST.LeftHandSide
 import Data.Array.Accelerate.AST.Var
@@ -230,9 +234,20 @@ buildOpenAcc aenv (OpenAcc pacc) =
         Tensor (ArrayR shR eR) sh' e'
 
       generateL :: ArrayR (Array sh e) -> Exp aenv sh -> Fun aenv (sh -> e) -> Tensor sh e
-      generateL aR sh f
+      generateL aR@(ArrayR shR eR) sh f@(Lam lhs (Body e))
         | Lam LeftHandSideWildcard{} (Body e) <- f = fillL aR sh e
-        | otherwise                                = unsupported "generate"
+        | Just Refl <- isIdentity f = Tensor aR sh' ranges
+        | otherwise                 = Tensor aR sh' $ buildOpenExp shR sh' (Empty `push` (lhs,ranges)) aenv e
+          where 
+            linearRange = TF.range 
+              (constant shR scalarTypeInt sh' 0) 
+              ( sh'')
+              (constant shR scalarTypeInt sh' 1)
+            sh' = buildOpenExp shR (singleton shR) Empty aenv sh
+            sh'' = buildOpenExp shR (singleton shR) Empty aenv (ShapeSize shR sh)
+            ranges = buildOpenExp shR sh' (Empty `push` (LeftHandSideSingle scalarTypeInt,linearRange)) aenv $ 
+              FromIndex shR (weakenE weakenEmpty sh) (PrimApp (PrimFromIntegral integralType numType) $ Evar $ Var scalarTypeInt ZeroIdx)
+
 
       replicateL
           :: SliceIndex slix sl co sh
@@ -331,6 +346,7 @@ buildOpenAcc aenv (OpenAcc pacc) =
           -> OpenAcc aenv (Array sh e)
           -> Tensor sh' e
       backpermuteL shR' sh' p acc
+        -- special case: transpose
         | ArrayR shR _                              <- arrayR acc
         , ShapeRsnoc (ShapeRsnoc ShapeRz)           <- shR
         , ShapeRsnoc (ShapeRsnoc ShapeRz)           <- shR'
@@ -345,9 +361,19 @@ buildOpenAcc aenv (OpenAcc pacc) =
         , Nil `Pair` Evar (Var _ ZeroIdx)
               `Pair` Evar (Var _ (SuccIdx ZeroIdx)) <- b
         = transposeL acc
-
-        | otherwise
-        = unsupported "backpermute"
+        -- TODO: special case: project one row or column from a matrix, e.g. 
+          -- backpermute
+          --   (indexSlice (I2 0 All_) (shape a0))
+          --   (\(x0) -> indexFull (I2 0 All_) (x0))
+        -- catch-all, inefficient version
+        | arr@(ArrayR shR eR) <- arrayR acc
+        , DeclareVars lhs w k <- declareVars (shapeType shR)
+        = buildA 
+          $ OpenAcc $ Alet (LeftHandSideSingle arr) acc 
+          $ OpenAcc $ Map eR (Lam lhs $ Body $ Index (Var arr ZeroIdx) (expVars $ k weakenId))
+          $ OpenAcc $ Generate (ArrayR shR' (shapeType shR)) 
+                        (weaken (weakenSucc weakenId) sh')
+                        (weaken (weakenSucc weakenId) p)
 
       transposeL
           :: OpenAcc aenv (Array DIM2 e)
@@ -408,4 +434,46 @@ buildOpenAcc aenv (OpenAcc pacc) =
 singleton :: ShapeR sh -> TensorShape sh
 singleton ShapeRz          = ()
 singleton (ShapeRsnoc shR) = (singleton shR, TF.constant (TF.Shape [1]) [1])
+
+
+data MinMax = Min | Max
+
+tpuArgMinMax :: MinMax
+             -> Tensor (sh, Int) a
+             -> Tensor  sh         Int32
+tpuArgMinMax minOrMax (Tensor (ArrayR (ShapeRsnoc shR) eR) (sh, _) t) = 
+  Tensor (ArrayR shR $ TupRsingle scalarTypeInt32) sh (array eR t)
+    where
+      array :: TypeR t -> TensorArrayData t -> TensorArrayData Int32
+      array TupRunit        () = TF.scalar @Int32 0
+      array TupRpair{}      _  = unsupported "argMin/Max: product types"
+      array (TupRsingle aR) a  = scalar aR a
+
+      scalar :: ScalarType t -> TensorArrayData t -> TensorArrayData Int32
+      scalar (SingleScalarType t) = single t
+      scalar (VectorScalarType _) = unsupported "SIMD-vector types"
+
+      single :: SingleType t -> TensorArrayData t -> TensorArrayData Int32
+      single (NumSingleType t) = num t
+
+      num :: NumType t -> TensorArrayData t -> TensorArrayData Int32
+      num (IntegralNumType t) = integral t
+      num (FloatingNumType t) = floating t
+
+      integral :: IntegralType t -> TensorArrayData t -> TensorArrayData Int32
+      integral TypeInt8   x = case minOrMax of Min -> TF.argMin x (TF.scalar @Int32 0); Max -> TF.argMax x (TF.scalar @Int32 0);
+      integral TypeInt16  x = case minOrMax of Min -> TF.argMin x (TF.scalar @Int32 0); Max -> TF.argMax x (TF.scalar @Int32 0);
+      integral TypeInt32  x = case minOrMax of Min -> TF.argMin x (TF.scalar @Int32 0); Max -> TF.argMax x (TF.scalar @Int32 0);
+      integral TypeInt64  x = case minOrMax of Min -> TF.argMin x (TF.scalar @Int32 0); Max -> TF.argMax x (TF.scalar @Int32 0);
+      integral TypeWord8  x = case minOrMax of Min -> TF.argMin x (TF.scalar @Int32 0); Max -> TF.argMax x (TF.scalar @Int32 0);
+      integral TypeWord16 x = case minOrMax of Min -> TF.argMin x (TF.scalar @Int32 0); Max -> TF.argMax x (TF.scalar @Int32 0);
+      integral TypeWord32 x = case minOrMax of Min -> TF.argMin x (TF.scalar @Int32 0); Max -> TF.argMax x (TF.scalar @Int32 0);
+      integral TypeWord64 x = case minOrMax of Min -> TF.argMin x (TF.scalar @Int32 0); Max -> TF.argMax x (TF.scalar @Int32 0);
+      integral TypeInt    x = case minOrMax of Min -> TF.argMin x (TF.scalar @Int32 0); Max -> TF.argMax x (TF.scalar @Int32 0);
+      integral TypeWord   x = case minOrMax of Min -> TF.argMin x (TF.scalar @Int32 0); Max -> TF.argMax x (TF.scalar @Int32 0);
+
+      floating :: FloatingType t -> TensorArrayData t -> TensorArrayData Int32
+      floating TypeFloat  x = case minOrMax of Min -> TF.argMin x (TF.scalar @Int32 0); Max -> TF.argMax x (TF.scalar @Int32 0);
+      floating TypeDouble x = case minOrMax of Min -> TF.argMin x (TF.scalar @Int32 0); Max -> TF.argMax x (TF.scalar @Int32 0);
+      floating TypeHalf   _ = unsupported "half-precision floating point"
 

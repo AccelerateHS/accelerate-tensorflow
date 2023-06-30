@@ -81,7 +81,7 @@ generate_sample_data
   -> (WhichData -> Gen e)
   -> Gen (RepresentativeData (Array sh e -> Array sh e -> Array sh e))
 generate_sample_data sh e = do
-  i  <- Gen.int (Range.linear 1 16)
+  i  <- Gen.int (Range.linear 10 16)
   xs <- Gen.list (Range.singleton i) (array ForSample sh e)
   ys <- Gen.list (Range.singleton i) (array ForSample sh e)
   return [ x :-> y :-> Result sh | x <- xs | y <- ys ]
