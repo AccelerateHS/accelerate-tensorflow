@@ -56,7 +56,7 @@ buildOpenExp contextR context env aenv =
             go :: TypeR s -> TensorArrayData s -> TensorArrayData s
             go TupRunit         ()     = ()
             go (TupRpair aR bR) (a, b) = (go aR a, go bR b)
-            go (TupRsingle aR)  a      = buildTypeDictsScalar aR (TF.fill sh_) a
+            go (TupRsingle aR)  a      = buildTypeDictsScalar aR $ TF.fill sh_ a
         in
         go
 
@@ -80,7 +80,8 @@ buildOpenExp contextR context env aenv =
       shapeL (Tensor (ArrayR shR' _) sh' _) = fillL (shapeType shR') sh'
 
       shapeSizeL :: ShapeR sh -> TensorArrayData sh -> TensorArrayData Int
-      shapeSizeL = shapeToTensor
+      shapeSizeL ShapeRz () = constant contextR scalarTypeInt context 1
+      shapeSizeL (ShapeRsnoc shr) (sh, n) = A.mul (IntegralNumType TypeInt) (n, shapeSizeL shr sh)
 
 
       gatherL :: Tensor sh e -> TensorArrayData Int -> TensorArrayData e
@@ -157,17 +158,29 @@ shapeToTensor
     => ShapeR sh
     -> TensorShape sh
     -> TF.Tensor TF.Build s
-shapeToTensor ShapeRz              ()       = TF.constant (TF.Shape [1]) [1]
-shapeToTensor (ShapeRsnoc ShapeRz) ((), sh) = sh
+shapeToTensor ShapeRz              ()       = TF.constant (TF.Shape [0]) []
+shapeToTensor (ShapeRsnoc ShapeRz) ((), sh) = TF.reshape sh (TF.constant (TF.Shape [1]) [1 :: ScalarTensorDataR Int])
 shapeToTensor shR                  sh       =
-  let
-      go :: (s ~ ScalarTensorDataR Int) => ShapeR sh -> TensorShape sh -> [TF.Tensor TF.Build s] -> [TF.Tensor TF.Build s]
+  let go :: ShapeR sh -> TensorShape sh
+         -> [TF.Tensor TF.Build (ScalarTensorDataR Int)] -> [TF.Tensor TF.Build (ScalarTensorDataR Int)]
       go ShapeRz         ()     acc = acc
       go (ShapeRsnoc tR) (t, h) acc = go tR t (h : acc)
-  in
-  -- XXX: Why is this reshape necessary?
-  TF.concat (TF.scalar 0) [ TF.reshape x (TF.constant (TF.Shape [1]) [1 :: ScalarTensorDataR Int]) | x <- go shR sh [] ]
-
+--   in TF.pack (go shR sh [])
+-- shapeToTensor
+--     :: (s ~ ScalarTensorDataR Int)
+--     => ShapeR sh
+--     -> TensorShape sh
+--     -> TF.Tensor TF.Build s
+-- shapeToTensor ShapeRz              ()       = TF.constant (TF.Shape [1]) [1]
+-- shapeToTensor (ShapeRsnoc ShapeRz) ((), sh) = sh
+-- shapeToTensor shR                  sh       =
+--   let
+--       go :: (s ~ ScalarTensorDataR Int) => ShapeR sh -> TensorShape sh -> [TF.Tensor TF.Build s] -> [TF.Tensor TF.Build s]
+--       go ShapeRz         ()     acc = acc
+--       go (ShapeRsnoc tR) (t, h) acc = go tR t (h : acc)
+--   -- XXX: Why is this reshape necessary?
+  in TF.concat (TF.scalar 0) [ TF.reshape x (TF.constant (TF.Shape [1]) [1 :: ScalarTensorDataR Int]) | x <- go shR sh [] ]
+  
 primConst
     :: ShapeR sh
     -> TensorShape sh

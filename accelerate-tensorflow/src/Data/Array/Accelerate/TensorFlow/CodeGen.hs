@@ -228,24 +228,24 @@ buildOpenAcc aenv (OpenAcc pacc) =
 
       fillL :: ArrayR (Array sh e) -> Exp aenv sh -> Exp aenv e -> Tensor sh e
       fillL (ArrayR shR eR) sh e =
-        let sh' = buildOpenExp shR (singleton shR) Empty aenv sh
-            e'  = buildOpenExp shR sh'             Empty aenv e
+        let sh' = buildOpenExp ShapeRz ()  Empty aenv sh
+            e'  = buildOpenExp shR     sh' Empty aenv e
         in
         Tensor (ArrayR shR eR) sh' e'
 
-      generateL :: ArrayR (Array sh e) -> Exp aenv sh -> Fun aenv (sh -> e) -> Tensor sh e
+      generateL :: forall sh e. ArrayR (Array sh e) -> Exp aenv sh -> Fun aenv (sh -> e) -> Tensor sh e
       generateL aR@(ArrayR shR eR) sh f@(Lam lhs (Body e))
         | Lam LeftHandSideWildcard{} (Body e) <- f = fillL aR sh e
         | Just Refl <- isIdentity f = Tensor aR sh' ranges
         | otherwise                 = Tensor aR sh' $ buildOpenExp shR sh' (Empty `push` (lhs,ranges)) aenv e
           where 
             linearRange = TF.range 
-              (constant shR scalarTypeInt sh' 0) 
-              ( sh'')
-              (constant shR scalarTypeInt sh' 1)
-            sh' = buildOpenExp shR (singleton shR) Empty aenv sh
-            sh'' = buildOpenExp shR (singleton shR) Empty aenv (ShapeSize shR sh)
-            ranges = buildOpenExp shR sh' (Empty `push` (LeftHandSideSingle scalarTypeInt,linearRange)) aenv $ 
+              (constant     ShapeRz scalarTypeInt () 0) 
+              (buildOpenExp ShapeRz               () Empty aenv (ShapeSize shR sh))
+              (constant     ShapeRz scalarTypeInt () 1)
+            sh' :: TensorShape sh
+            sh' = buildOpenExp ShapeRz () Empty aenv sh
+            ranges = buildOpenExp shR sh' (Empty `push` (LeftHandSideSingle scalarTypeInt, TF.reshape linearRange (shapeToTensor shR sh'))) aenv $ 
               FromIndex shR (weakenE weakenEmpty sh) (PrimApp (PrimFromIntegral integralType numType) $ Evar $ Var scalarTypeInt ZeroIdx)
 
 

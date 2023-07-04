@@ -129,7 +129,7 @@ instance Similar Int8
 instance Similar Int16
 instance Similar Int32
 instance Similar Int64
-instance (Eq sh, Eq sz) => Similar (sh:.sz)
+instance (Similar sh, Similar sz, Eq sh, Eq sz) => Similar (sh:.sz)
 
 instance (Shape sh, Eq sh, Elt e, Similar e) => Similar (Array sh e) where
   a1 ~= a2 = shape a1 == shape a2 && go 0
