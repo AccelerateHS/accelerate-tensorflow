@@ -56,14 +56,14 @@ def read_datatype(f):
     # switch-case construct
     #
     switch = {
-        0:  (1, "b", np.byte),      # Type.Int8
-        1:  (2, "h", np.short),     # Type.Int16
-        2:  (4, "i", np.intc),      # Type.Int32
-        3:  (8, "q", np.longlong),  # Type.Int64
-        4:  (1, "B", np.ubyte),     # Type.Word8
-        5:  (2, "H", np.ushort),    # Type.Word16
-        6:  (4, "I", np.uintc),     # Type.Word32
-        7:  (8, "Q", np.ulonglong), # Type.Word64
+        0:  (1, "b", np.int8),      # Type.Int8
+        1:  (2, "h", np.int16),     # Type.Int16
+        2:  (4, "i", np.int32),      # Type.Int32
+        3:  (8, "q", np.int64),  # Type.Int64
+        4:  (1, "B", np.uint8),     # Type.Word8
+        5:  (2, "H", np.uint16),    # Type.Word16
+        6:  (4, "I", np.uint32),     # Type.Word32
+        7:  (8, "Q", np.uint64),  # Type.Word64
         8:  (2, "h", np.float16),   # Type.Float16
         9:  (4, "f", np.float32),   # Type.Float32
         10: (8, "d", np.float64),   # Type.Float64
