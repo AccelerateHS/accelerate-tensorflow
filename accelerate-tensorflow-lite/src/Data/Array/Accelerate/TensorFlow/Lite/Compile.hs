@@ -37,7 +37,6 @@ import Control.Exception
 import Data.ByteString                                              ( ByteString )
 import Data.ByteString.Builder                                      ( Builder )
 import Data.Functor.Identity
-import Data.List
 import Data.ProtoLens
 import Formatting
 import Lens.Family2
@@ -61,9 +60,8 @@ import Paths_accelerate_tensorflow_lite
 compileTfunWith :: Tfun f -> [Args f] -> IO ByteString
 compileTfunWith f xs = do
   let f'  = graph_of_model f
-      xs' = B.word8 (genericLength xs) <> foldMap buildArgs xs
   --
-  tflite <- tflite_model f' xs'
+  tflite <- tflite_model f' (serialiseReprData xs)
   edge   <- edgetpu_compile tflite
   model  <- B.readFile edge
   return model

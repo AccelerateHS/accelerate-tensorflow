@@ -5,103 +5,68 @@ import sys
 import struct
 
 
-# TODO: This script might need some additional data to work.
+# Format for the "representative data" file, in pseudo-BNF.
 #
-# Format specified in pseudo-BNF:
-
-#   representative_data_file -> dataset_count tensor_count array+
-#   dataset_count -> word8
-#   tensor_count -> word8
-#   array -> shape component_count array_data+
-#   shape -> rank dimension*
-#   rank -> word8
-#   dimension -> i64
-#   componont_count -> word8
-#   array_data -> datatype databuffer
-#   datatype -> word8 in [0..10]
-#   databuffer -> (the amount of values is the product of the dimensions from the shape)
+# A "list" is a word64LE length, followed by that many elements.
 #
+# representative_data_file -> list[dataset]
+# dataset -> list[array]                      # list of arguments for one model invocation
+# array -> numelements list[array_data]       # one argument array in SoA format
+# numelements -> word64LE                     # the number of elements in this array
+# array_data -> datatype databuffer           # one tuple component (of the SoA form)
+# datatype -> word8 in [0..10]
+# databuffer -> (values of specified data type; count is the numelements field for this array)
 def parse_representative_data_file(file_path):
     with open(file_path, "rb") as f:
-        # Parse the number of representative datasets
-        dataset_count = read_word8(f)
+        for dataset in read_list(f, read_dataset, lazy=True):
+            yield dataset
 
-        for _ in range(dataset_count):
-            # Parse the number of input tensors per representative dataset
-            tensor_count = read_word8(f)
+def read_dataset(f):
+    return read_list(f, read_array)
 
-            tensors = []
-            for _ in range(tensor_count):
-                tensors.extend(read_array(f))
-            #end
-            yield tensors
-        #end
-    #end (I hate python's indentation rules...)
+def read_array(f):
+    num_elems = read_word64le(f)
+    return read_list(f, lambda f: read_array_data(num_elems, f))
 
-
-def read_word8(f):
-    b = bytearray(1)
-    f.readinto(b)
-    return struct.unpack("B", b)[0]
-
-def read_int64(f):
-    b = bytearray(8)
-    f.readinto(b)
-    return struct.unpack("q", b)[0]
+def read_array_data(num_elems, f):
+    (bytes_per_elem, str_format, numpy_dtype) = read_datatype(f)
+    data = bytearray(num_elems * bytes_per_elem)
+    f.readinto(data)
+    return np.array(struct.unpack("<" + str_format * size, data), dtype=numpy_dtype)
 
 def read_datatype(f):
     # NOTE: Must match encoding used by 'tagOfType'
-    #
-    # Using a dictionary here because python doesn't have the standard
-    # switch-case construct
-    #
     switch = {
-        0:  (1, "b", np.byte),      # Type.Int8
-        1:  (2, "h", np.short),     # Type.Int16
-        2:  (4, "i", np.intc),      # Type.Int32
-        3:  (8, "q", np.longlong),  # Type.Int64
-        4:  (1, "B", np.ubyte),     # Type.Word8
-        5:  (2, "H", np.ushort),    # Type.Word16
-        6:  (4, "I", np.uintc),     # Type.Word32
-        7:  (8, "Q", np.ulonglong), # Type.Word64
-        8:  (2, "h", np.float16),   # Type.Float16
-        9:  (4, "f", np.float32),   # Type.Float32
-        10: (8, "d", np.float64),   # Type.Float64
+        0:  (1, "b", np.int8),
+        1:  (2, "h", np.int16),
+        2:  (4, "i", np.int32),
+        3:  (8, "q", np.int64),
+        4:  (1, "B", np.uint8),
+        5:  (2, "H", np.uint16),
+        6:  (4, "I", np.uint32),
+        7:  (8, "Q", np.uint64),
+        8:  (2, "h", np.float16),
+        9:  (4, "f", np.float32),
+        10: (8, "d", np.float64),
     }
     t = read_word8(f)
     return switch.get(t)
 
-
-def read_shape(f):
-    rank = read_word8(f)
-    b = bytearray(rank * 8)
+def read_word64le(f):
+    b = bytearray(8)
     f.readinto(b)
-    shape = struct.unpack("q" * rank, b)
+    return struct.unpack("<q", b)[0]
 
-    # Apparently functional style is not "pythonic" so here we go, have a foldl (*) 1:
-    size = 1
-    for x in shape:
-        size *= x
-    #end
+def read_word8(f):
+    b = bytearray(1)
+    f.readinto(b)
+    return b[0]
 
-    return (rank, shape, size)
-
-
-# Surely there is a better way to interpret binary data in python??!
-#
-def read_array(f):
-    (rank, shape, size) = read_shape(f)
-    component_count = read_word8(f)
-
-    array_data = []
-    for _ in range(component_count):
-        (bytes_per_elem, str_format, numpy_dtype) = read_datatype(f)
-        data = bytearray(size * bytes_per_elem)
-        f.readinto(data)
-        array_data.append(np.array(struct.unpack(str_format * size, data), dtype=numpy_dtype))
-    #end
-
-    return array_data
+def read_list(f, reader, lazy=False):
+    n = read_word64le(f)
+    result_iter = (reader(f) for _ in range(n))
+    if lazy: return result_iter
+    else: return list(result_iter)
 
 
 # Parses command-line arguments
@@ -124,39 +89,23 @@ def parse_args(args):
     out_arrs  = ""
 
     for arg in args:
-        if arg.startswith('--graph_def_file='):
-            graph_def = arg[17:]
-            pass
-        elif arg.startswith('--output_file='):
-            outfile = arg[14:]
-            pass
-        elif arg.startswith('--data_file='):
-            data_file = arg[12:]
-            pass
-        elif arg.startswith('--input_arrays='):
-            in_arrs = parse_array_arg(arg[15:])
-            pass
-        elif arg.startswith('--output_arrays='):
-            out_arrs = parse_array_arg(arg[16:])
-            pass
-        #end
-    #end
+        if arg.startswith('--graph_def_file='):  graph_def = arg[17:]
+        elif arg.startswith('--output_file='):   outfile = arg[14:]
+        elif arg.startswith('--data_file='):     data_file = arg[12:]
+        elif arg.startswith('--input_arrays='):  in_arrs = arg[15:].split(",")
+        elif arg.startswith('--output_arrays='): out_arrs = arg[16:].split(",")
 
     return (graph_def, outfile, in_arrs, out_arrs, data_file)
-
-
-def parse_array_arg(arg):
-    return arg.split(",")
 
 
 def main():
     in_file, out_file, inputs, outputs, data_file = parse_args(sys.argv)
 
     converter = tf.compat.v1.lite.TFLiteConverter.from_frozen_graph(
-        graph_def_file=in_file
-      , input_arrays=inputs
-      , output_arrays=outputs
-      )
+        graph_def_file=in_file,
+        input_arrays=inputs,
+        output_arrays=outputs
+    )
 
     converter.optimizations = [tf.lite.Optimize.DEFAULT]
     converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
@@ -167,9 +116,8 @@ def main():
 
     tflite_model = converter.convert()
     with tf.io.gfile.GFile(out_file, 'wb') as f:
-      f.write(tflite_model)
+        f.write(tflite_model)
 
 
 if __name__ == "__main__":
     main()
-

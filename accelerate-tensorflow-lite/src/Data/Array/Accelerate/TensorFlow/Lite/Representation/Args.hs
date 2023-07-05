@@ -1,6 +1,6 @@
-{-# LANGUAGE AllowAmbiguousTypes  #-}
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE GADTs                #-}
+{-# LANGUAGE RankNTypes           #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE TypeApplications     #-}
 {-# LANGUAGE TypeFamilies         #-}
@@ -16,8 +16,13 @@
 -- Portability : non-portable (GHC extensions)
 --
 
-module Data.Array.Accelerate.TensorFlow.Lite.Representation.Args
-  where
+module Data.Array.Accelerate.TensorFlow.Lite.Representation.Args (
+
+  Args(..),
+  serialiseReprData,
+  tagOfType,
+
+) where
 
 import Data.Array.Accelerate.TensorFlow.CodeGen.Base
 import Data.Array.Accelerate.TensorFlow.TypeDicts
@@ -31,12 +36,12 @@ import Data.Array.Accelerate.Representation.Shape
 import Data.Array.Accelerate.Representation.Type
 import Data.Array.Accelerate.Type
 
+import Data.List                                                    ( genericLength )
 import Foreign.ForeignPtr
 import Foreign.Storable
 
 import Data.ByteString.Builder                                      ( Builder )
 import qualified Data.ByteString.Builder                            as B
-import qualified Data.ByteString.Builder.Extra                      as B
 import qualified Data.ByteString.Internal                           as B
 
 
@@ -45,52 +50,38 @@ data Args f where
   Aresult :: ShapesR a -> Shapes a    -> Args a
 
 
+-- | Serialise a representative dataset (i.e. a list of argument sets) for converter.py.
+serialiseReprData :: [Args f] -> Builder
+serialiseReprData = buildList . map buildArgs
+
 buildArgs :: Args f -> Builder
-buildArgs args =
-  let
-      count :: Args a -> Word8
-      count Aresult{}          = 0
-      count (Aparam arrR _ xs) = go arrR + count xs
-        where
-          go :: ArraysR a -> Word8
-          go TupRunit         = 0
-          go TupRsingle{}     = 1
-          go (TupRpair aR bR) = go aR + go bR
+buildArgs args = buildList (foldArgs buildArray args)
+  where
+    foldArgs :: Monoid s => (forall t. ArraysR t -> t -> s) -> Args a -> s
+    foldArgs f (Aparam rep val rest) = f rep val <> foldArgs f rest
+    foldArgs _ Aresult{} = mempty
 
-      tensors :: Args a -> Builder
-      tensors Aresult{}              = mempty
-      tensors (Aparam arrR arr next) = go arrR arr <> tensors next
-        where
-          go :: ArraysR a -> a -> Builder
-          go TupRunit                         ()               = mempty
-          go (TupRpair aR bR)                 (a, b)           = go aR a <> go bR b
-          go (TupRsingle (ArrayR shR adataR)) (Array sh adata) =
-            let
-                count' :: TypeR e -> Word8
-                count' TupRunit         = 0
-                count' TupRsingle{}     = 1
-                count' (TupRpair aR bR) = count' aR + count' bR
+    buildArray :: ArraysR a -> a -> [Builder]
+    buildArray TupRunit                         ()               = []
+    buildArray (TupRpair aR bR)                 (a, b)           = buildArray aR a ++ buildArray bR b
+    buildArray (TupRsingle (ArrayR shR adataR)) (Array sh adata) =
+      let shapeSizeR :: ShapeR sh -> sh -> Int
+          shapeSizeR ShapeRz           ()       = 1
+          shapeSizeR (ShapeRsnoc shR') (sh', n) = n * shapeSizeR shR' sh'
 
-                buildShape :: ShapeR sh -> sh -> Builder
-                buildShape ShapeRz         ()     = mempty
-                buildShape (ShapeRsnoc tR) (t, h) = B.int64Host (fromIntegral h) <> buildShape tR t
+          buildArrayData :: TypeR e -> ArrayData e -> [Builder]
+          buildArrayData TupRunit         ()     = []
+          buildArrayData (TupRpair aR bR) (a, b) = buildArrayData aR a ++ buildArrayData bR b
+          buildArrayData (TupRsingle aR)  a      = [B.word8 (tagOfType aR) <> buildTypeDictsScalar aR wrap a]
 
-                buildArrayData :: TypeR e -> ArrayData e -> Builder
-                buildArrayData TupRunit         ()     = mempty
-                buildArrayData (TupRpair aR bR) (a, b) = buildArrayData aR a <> buildArrayData bR b
-                buildArrayData (TupRsingle aR)  a      = B.word8 (tagOfType aR) <> buildTypeDictsScalar aR wrap a
+          wrap :: forall a. Storable a => UniqueArray a -> Builder
+          wrap (unsafeGetValue . uniqueArrayData -> fp)
+            = B.byteString
+            $ B.fromForeignPtr (castForeignPtr fp) 0 (size shR sh * sizeOf (undefined::a))
+      in [B.word64LE (fromIntegral (shapeSizeR shR sh)) <> buildList (buildArrayData adataR adata)]
 
-                wrap :: forall a. Storable a => UniqueArray a -> Builder
-                wrap (unsafeGetValue . uniqueArrayData -> fp)
-                  = B.byteString
-                  $ B.fromForeignPtr (castForeignPtr fp) 0 (size shR sh * sizeOf (undefined::a))
-            in
-            B.word8 (fromIntegral (rank shR))
-            <> buildShape shR sh
-            <> B.word8 (count' adataR)
-            <> buildArrayData adataR adata
-  in
-  B.word8 (count args) <> tensors args
+buildList :: [Builder] -> Builder
+buildList builders = B.word64LE (genericLength builders) <> mconcat builders
 
 
 -- NOTE: This must match what is expected in converter.py and edgetpu.cc
@@ -135,4 +126,3 @@ tagOfType = scalar
     floating TypeHalf   = 8
     floating TypeFloat  = 9
     floating TypeDouble = 10
-
