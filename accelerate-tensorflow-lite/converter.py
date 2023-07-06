@@ -22,17 +22,17 @@ def parse_representative_data_file(file_path):
             yield dataset
 
 def read_dataset(f):
-    return read_list(f, read_array)
+    return [arr for tup in read_list(f, read_array, lazy=True) for arr in tup]
 
 def read_array(f):
     num_elems = read_word64le(f)
-    return read_list(f, lambda f: read_array_data(num_elems, f))
+    return read_list(f, lambda f: read_array_data(num_elems, f), lazy=True)
 
 def read_array_data(num_elems, f):
     (bytes_per_elem, str_format, numpy_dtype) = read_datatype(f)
     data = bytearray(num_elems * bytes_per_elem)
     f.readinto(data)
-    return np.array(struct.unpack("<" + str_format * size, data), dtype=numpy_dtype)
+    return np.array(struct.unpack("<" + str_format * num_elems, data), dtype=numpy_dtype)
 
 def read_datatype(f):
     # NOTE: Must match encoding used by 'tagOfType'
