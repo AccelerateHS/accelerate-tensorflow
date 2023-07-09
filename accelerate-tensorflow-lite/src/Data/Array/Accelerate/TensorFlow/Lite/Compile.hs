@@ -14,6 +14,7 @@ module Data.Array.Accelerate.TensorFlow.Lite.Compile (
 
   compileTfun,
   compileTfunIn,
+  edgetpu_compile,
 
 ) where
 

@@ -42,6 +42,7 @@ library
       Data.Array.Accelerate.TensorFlow.Lite.Representation.Shapes
       Data.Array.Accelerate.TensorFlow.Lite.Sugar.Args
       Data.Array.Accelerate.TensorFlow.Lite.Sugar.Shapes
+      Data.Array.Accelerate.TensorFlow.Lite.ManualTest
       System.IO.Temp
       System.Process.Extra
       Paths_accelerate_tensorflow_lite
