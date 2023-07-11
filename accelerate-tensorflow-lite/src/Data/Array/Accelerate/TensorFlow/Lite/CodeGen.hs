@@ -124,6 +124,5 @@ tensorShape
     :: ShapeR sh
     -> sh
     -> TF.Shape
-tensorShape ShapeRz () = TF.Shape [1]
 tensorShape shR     sh = TF.Shape [ fromIntegral x | x <- reverse (shapeToList shR sh) ]
 
