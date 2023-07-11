@@ -2,8 +2,9 @@
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE TypeOperators       #-}
 -- |
--- Module      : Data.Array.Accelerate.Test.NoFib.Prelude.Map
+-- Module      : Data.Array.Accelerate.Test.NoFib.Prelude.Generate
 -- Copyright   : [2022] The Accelerate Team
 -- License     : BSD3
 --
@@ -12,9 +13,9 @@
 -- Portability : non-portable (GHC extensions)
 --
 
-module Data.Array.Accelerate.Test.NoFib.Prelude.Map (
+module Data.Array.Accelerate.Test.NoFib.Prelude.Foreign (
 
-  test_map
+  test_foreign
 
 ) where
 
@@ -36,49 +37,62 @@ import Test.Tasty.Hedgehog
 import Prelude                                                      as P
 
 
-test_map :: TestTree
-test_map =
-  testGroup "map"
-    [ testDim dim0
-    , testDim dim1
+test_foreign :: TestTree
+test_foreign =
+  testGroup "foreign"
+    [ testDim dim1
     , testDim dim2
+    , testDim dim3
     ]
     where
       testDim :: forall sh. (Shape sh, Show sh, P.Eq sh)
-              => Gen sh
+              => Gen (sh:.Int)
               -> TestTree
       testDim dim =
         testGroup ("DIM" P.++ show (rank @sh))
-          [ testProperty "plus1" $ prop_map (+1) dim i64
-          , testProperty "sin"   $ prop_map sin dim f32
-          , testProperty "cos"   $ prop_map cos dim f32
-          , testProperty "sqrt"  $ prop_map sqrt dim (fmap abs . f32)
+          [ testProperty "argmin" $ prop_min dim f32
+          , testProperty "argmax" $ prop_max dim i16
           ]
 
-
-prop_map
-    :: (P.Eq sh, Show sh, Shape sh, Elt e, Show e, Similar e)
-    => (Exp e -> Exp e)
-    -> Gen sh
+prop_min
+    :: (P.Eq sh, Show sh, Shape sh, Elt e, Show e, Similar e, A.Ord e)
+    => Gen (sh:.Int)
     -> (WhichData -> Gen e)
     -> Property
-prop_map f dim e =
+prop_min dim e =
   property $ do
     sh  <- forAll dim
     dat <- forAll (generate_sample_data sh e)
     xs  <- forAll (array ForInput sh e)
-    let !ref = I.runN (A.map f)
-        !tpu = TPU.compile (A.map f) dat
+    let !f   = argMin
+        !ref = I.runN f
+        !tpu = TPU.compile f dat
     --
     TPU.execute tpu xs ~~~ ref xs
 
+prop_max
+    :: (P.Eq sh, Show sh, Shape sh, Elt e, Show e, Similar e, A.Ord e)
+    => Gen (sh:.Int)
+    -> (WhichData -> Gen e)
+    -> Property
+prop_max dim e =
+  property $ do
+    sh  <- forAll dim
+    dat <- forAll (generate_sample_data sh e)
+    xs  <- forAll (array ForInput sh e)
+    let !f   = argMax
+        !ref = I.runN f
+        !tpu = TPU.compile f dat
+    --
+    TPU.execute tpu xs ~~~ ref xs
+
+
 generate_sample_data
   :: (Shape sh, Elt e)
-  => sh
+  => (sh:.Int)
   -> (WhichData -> Gen e)
-  -> Gen (RepresentativeData (Array sh e -> Array sh e))
-generate_sample_data sh e = do
-  i  <- Gen.int (Range.linear 10 16)
-  xs <- Gen.list (Range.singleton i) (array ForSample sh e)
+  -> Gen (RepresentativeData (Array (sh:.Int) e -> Array sh (Int32, e)))
+generate_sample_data (sh:.sz) e = do
+  xs <- Gen.list (Range.linear 10 16) (array ForSample (sh:.sz) e)
   return [ x :-> Result sh | x <- xs ]
 

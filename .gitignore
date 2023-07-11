@@ -17,3 +17,6 @@ cabal.project
 
 # Downloaded Bazel executable
 bazel511
+
+# Proprietary
+accelerate-tensorflow-lite/test/autoencoder/
