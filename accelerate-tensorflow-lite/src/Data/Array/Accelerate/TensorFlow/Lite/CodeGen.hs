@@ -1,5 +1,6 @@
 {-# LANGUAGE GADTs             #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes        #-}
 -- |
 -- Module      : Data.Array.Accelerate.TensorFlow.Lite.CodeGen
 -- Copyright   : [2021..2022] The Accelerate Team
@@ -40,44 +41,50 @@ import qualified TensorFlow.Ops                                     as TF hiding
 
 import Control.Monad.State
 import Text.Printf
+import Data.Bifunctor                                               ( second )
 import qualified Data.Text                                          as T
 
 
-buildAfunWith :: Afun f -> Args f -> Tfun f
-buildAfunWith f xs = evalState (buildOpenAfunWith Aempty f xs) 0
+buildAfunWith :: Afun f -> Args f -> (Tfun f, ArgsNames f)
+buildAfunWith f xs =
+  evalState (buildOpenAfunWith Aempty f xs) 0
 
-buildOpenAfunWith :: Aval aenv -> OpenAfun aenv f -> Args f -> State Int (OpenTfun aenv f)
+buildOpenAfunWith :: Aval aenv -> OpenAfun aenv f -> Args f -> State Int (OpenTfun aenv f, ArgsNames f)
 buildOpenAfunWith aenv (Alam lhs f) (Aparam xR x xs)
   | Just Refl <- matchArraysR (lhsToTupR lhs) xR
   = let
-        go :: ALeftHandSide t aenv aenv' -> t -> Aval aenv -> State Int (Aval aenv')
-        go LeftHandSideWildcard{}                      _             env = return env
-        go (LeftHandSidePair aR bR)                    (a, b)        env = go bR b =<< go aR a env
+        go :: ALeftHandSide t aenv aenv' -> t -> Aval aenv -> State Int (Aval aenv', TupR ArrArgNames t)
+        go (LeftHandSideWildcard aR)                   _             env = return (env, mapTupR (\ArrayR{} -> ArrArgSkip) aR)
+        go (LeftHandSidePair aR bR)                    (a, b)        env = do
+          (env', t1) <- go aR a env
+          (env'', t2) <- go bR b env'
+          return (env'', TupRpair t1 t2)
         go (LeftHandSideSingle arrR@(ArrayR _shR _eR)) (Array _sh _) env = state $ \i ->
-          let sh'    = shape _shR _sh
-              adata' = evalState (array _eR) 0
+          let sh'             = shape _shR _sh
+              (adata', names) = evalState (array _eR) 0
 
               shape :: ShapeR sh -> sh -> TensorShape sh
               shape ShapeRz         ()     = ()
               shape (ShapeRsnoc tR) (t, h) = (shape tR t, TF.constant (TF.Shape [1]) [fromIntegral h])
 
-              array :: TypeR t -> State Int (TensorArrayData t)
-              array TupRunit         = return ()
-              array (TupRpair aR bR) = (,) <$> array aR <*> array bR
-              array (TupRsingle aR)  = buildTypeDictsScalar aR placeholder
+              array :: TypeR t -> State Int (TensorArrayData t, TupR ArgName t)
+              array TupRunit         = return ((), TupRunit)
+              array (TupRpair aR bR) = (\(d1,n1) (d2,n2) -> ((d1,d2), TupRpair n1 n2)) <$> array aR <*> array bR
+              array (TupRsingle aR)  = buildTypeDictsScalar aR (second (TupRsingle . ArgName) <$> placeholder)
                 where
-                  placeholder :: TF.TensorType t => State Int (TF.Tensor TF.Build t)
+                  placeholder :: TF.TensorType t => State Int (TF.Tensor TF.Build t, T.Text)
                   placeholder = state $ \j ->
-                    let opName  = TF.opName .~ TF.explicitName (T.pack (printf "input%d_adata%d" i j))
+                    let name    = T.pack (printf "input%d_adata%d" i j)
+                        opName  = TF.opName .~ TF.explicitName name
                         opShape = TF.opAttr "shape" .~ tensorShape _shR _sh
                     in
-                    (TF.placeholder' (opName . opShape), j+1)
+                    ((TF.placeholder' (opName . opShape), name), j+1)
           in
-          (env `Apush` Tensor arrR sh' adata', i+1)
+          ((env `Apush` Tensor arrR sh' adata', TupRsingle (ArrArgNames names)), i+1)
   in do
-  aenv' <- go lhs x aenv
-  f'    <- buildOpenAfunWith aenv' f xs
-  return $ Tlam lhs f'
+  (aenv', tupargnames) <- go lhs x aenv
+  (f', restargnames) <- buildOpenAfunWith aenv' f xs
+  return $ (Tlam lhs f', ANparam tupargnames restargnames)
 --
 buildOpenAfunWith aenv (Abody f) (Aresult _ rsh)
   = let
@@ -115,10 +122,15 @@ buildOpenAfunWith aenv (Abody f) (Aresult _ rsh)
 
         f' = evalState (go (arraysR f) rsh (buildOpenAcc aenv f)) 0
   in
-  return $ Tbody (arraysR f) f'
+  return $ (Tbody (arraysR f) f', ANresult)
 --
 buildOpenAfunWith _ _ _ =
   error "impossible"
+
+mapTupR :: (forall a. f a -> g a) -> TupR f t -> TupR g t
+mapTupR f (TupRpair a b) = TupRpair (mapTupR f a) (mapTupR f b)
+mapTupR f (TupRsingle x) = TupRsingle (f x)
+mapTupR _ TupRunit = TupRunit
 
 tensorShape
     :: ShapeR sh

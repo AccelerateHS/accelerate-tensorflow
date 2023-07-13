@@ -37,6 +37,7 @@ import Control.Exception
 import Data.ByteString                                              ( ByteString )
 import Data.ByteString.Builder                                      ( Builder )
 import Data.Functor.Identity
+import qualified Data.Set                                           as Set
 import Data.ProtoLens
 import Formatting
 import Lens.Family2
@@ -57,11 +58,13 @@ import Paths_accelerate_tensorflow_lite
 -- | Compile a tensorflow graph together with the given representative data
 -- into a quantized tensorflow-lite model.
 --
-compileTfunWith :: Tfun f -> [Args f] -> IO ByteString
-compileTfunWith f xs = do
-  let f'  = graph_of_model f
+compileTfunWith :: Tfun f -> ArgsNames f -> [Args f] -> IO ByteString
+compileTfunWith f argsnames xs = do
+  let graph = graph_of_model f
+  let actualInputs =
+        Set.fromList $ filter (T.isPrefixOf "input") $ map (view TF.name) (graph ^. TF.node)
   --
-  tflite <- tflite_model f' (serialiseReprData xs)
+  tflite <- tflite_model graph (serialiseReprData argsnames actualInputs xs)
   edge   <- edgetpu_compile tflite
   model  <- B.readFile edge
   return model

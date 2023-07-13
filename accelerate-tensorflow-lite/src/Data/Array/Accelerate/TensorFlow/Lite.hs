@@ -98,11 +98,11 @@ type RepresentativeData f = [Args f]
 --
 compile :: forall f. (Afunction f) => f -> RepresentativeData (AfunctionR f) -> Model (AfunctionR f)
 compile acc args = unsafePerformIO $ do
-  Model afunR (modelAfun afunR tfun x) <$> compileTfunWith tfun (x:xs)
+  Model afunR (modelAfun afunR tfun x) <$> compileTfunWith tfun argsnames (x:xs)
   where
     !afunR = afunctionRepr @f
     !afun  = simplifyAfun (convertAfun acc)
-    !tfun  = buildAfunWith afun x
+    (!tfun, !argsnames) = buildAfunWith afun x
     x:xs   = map (fromArgs afunR) args
 
 

@@ -19,6 +19,9 @@
 module Data.Array.Accelerate.TensorFlow.Lite.Representation.Args (
 
   Args(..),
+  ArgsNames(..),
+  ArrArgNames(..),
+  ArgName(..),
   serialiseReprData,
   tagOfType,
 
@@ -39,46 +42,73 @@ import Data.Array.Accelerate.Type
 import Data.List                                                    ( genericLength )
 import Foreign.ForeignPtr
 import Foreign.Storable
+import qualified Data.Set                                           as Set
+import Data.Set                                                     ( Set )
+import qualified Data.Text                                          as T
 
 import Data.ByteString.Builder                                      ( Builder )
 import qualified Data.ByteString.Builder                            as B
 import qualified Data.ByteString.Internal                           as B
 
 
+-- | Description, in representation types, of the arguments and the result shape
+-- of the model.
 data Args f where
   Aparam  :: ArraysR a -> a -> Args b -> Args (a -> b)
   Aresult :: ShapesR a -> Shapes a    -> Args a
 
 
+-- | The name for a single TF input array.
+newtype ArgName t = ArgName T.Text
+  deriving (Show)
+
+-- | This Accelerate argument (itself, due to SoA, consisting of potentially
+-- multiple TF arrays) may have names for each of its tuple slices, or may be
+-- skipped wholesale.
+data ArrArgNames t where
+  ArrArgNames :: TupR ArgName a -> ArrArgNames (Array sh a)
+  ArrArgSkip  ::                   ArrArgNames (Array sh a)
+
+-- | The names for the accelerate (SoA) input arrays in the TF program.
+data ArgsNames f where
+  ANparam  :: TupR ArrArgNames a -> ArgsNames b -> ArgsNames (a -> b)
+  ANresult :: ArgsNames a
+
+
 -- | Serialise a representative dataset (i.e. a list of argument sets) for converter.py.
-serialiseReprData :: [Args f] -> Builder
-serialiseReprData = buildList . map buildArgs
+serialiseReprData :: ArgsNames f -> Set T.Text -> [Args f] -> Builder
+serialiseReprData argsnames actualInputs = buildList . map (buildArgs argsnames actualInputs)
 
-buildArgs :: Args f -> Builder
-buildArgs args = buildList (foldArgs buildArray args)
+buildArgs :: ArgsNames f -> Set T.Text -> Args f -> Builder
+buildArgs argsnames actualInputs args = buildList (foldArgs buildArg args argsnames)
   where
-    foldArgs :: Monoid s => (forall t. ArraysR t -> t -> s) -> Args a -> s
-    foldArgs f (Aparam rep val rest) = f rep val <> foldArgs f rest
-    foldArgs _ Aresult{} = mempty
+    foldArgs :: Monoid s => (forall t. ArraysR t -> TupR ArrArgNames t -> t -> s) -> Args f -> ArgsNames f -> s
+    foldArgs f (Aparam rep val rest) (ANparam names restnames) = f rep names val <> foldArgs f rest restnames
+    foldArgs _ Aresult{} ANresult = mempty
+    foldArgs _ _ _ = error "Insufficient entries in ArgsNames vector"
 
-    buildArray :: ArraysR a -> a -> [Builder]
-    buildArray TupRunit                         ()               = []
-    buildArray (TupRpair aR bR)                 (a, b)           = buildArray aR a ++ buildArray bR b
-    buildArray (TupRsingle (ArrayR shR adataR)) (Array sh adata) =
+    buildArg :: ArraysR a -> TupR ArrArgNames a -> a -> [Builder]
+    buildArg TupRunit                         TupRunit                         ()               = []
+    buildArg (TupRpair aR bR)                 (TupRpair ns1 ns2)               (a, b)           = buildArg aR ns1 a ++ buildArg bR ns2 b
+    buildArg _                                (TupRsingle ArrArgSkip)          _                = []
+    buildArg (TupRsingle (ArrayR shR adataR)) (TupRsingle (ArrArgNames names)) (Array sh adata) =
       let shapeSizeR :: ShapeR sh -> sh -> Int
           shapeSizeR ShapeRz           ()       = 1
           shapeSizeR (ShapeRsnoc shR') (sh', n) = n * shapeSizeR shR' sh'
 
-          buildArrayData :: TypeR e -> ArrayData e -> [Builder]
-          buildArrayData TupRunit         ()     = []
-          buildArrayData (TupRpair aR bR) (a, b) = buildArrayData aR a ++ buildArrayData bR b
-          buildArrayData (TupRsingle aR)  a      = [B.word8 (tagOfType aR) <> buildTypeDictsScalar aR wrap a]
+          buildArrayData :: TypeR e -> ArrayData e -> TupR ArgName e -> [Builder]
+          buildArrayData TupRunit         ()     _                           = []
+          buildArrayData (TupRpair aR bR) (a, b) (TupRpair ns1 ns2)          = buildArrayData aR a ns1 ++ buildArrayData bR b ns2
+          buildArrayData (TupRsingle aR)  a      (TupRsingle (ArgName name))
+            | name `Set.member` actualInputs = [B.word8 (tagOfType aR) <> buildTypeDictsScalar aR (wrap a)]
+            | otherwise                      = []
+          buildArrayData _ _ _ = error "impossible"
 
           wrap :: forall a. Storable a => UniqueArray a -> Builder
           wrap (unsafeGetValue . uniqueArrayData -> fp)
             = B.byteString
             $ B.fromForeignPtr (castForeignPtr fp) 0 (size shR sh * sizeOf (undefined::a))
-      in [B.word64LE (fromIntegral (shapeSizeR shR sh)) <> buildList (buildArrayData adataR adata)]
+      in [B.word64LE (fromIntegral (shapeSizeR shR sh)) <> buildList (buildArrayData adataR adata names)]
 
 buildList :: [Builder] -> Builder
 buildList builders = B.word64LE (genericLength builders) <> mconcat builders
