@@ -15,6 +15,7 @@ import Test.Tasty.Hedgehog
 
 import Data.Array.Accelerate.Test.NoFib.Prelude
 import Data.Array.Accelerate.Test.NoFib.Imaginary
+import Data.Array.Accelerate.Test.NoFib.Misc
 
 
 main :: IO ()
@@ -25,5 +26,6 @@ main
   $ testGroup "nofib-tensorflow-lite"
       [ test_prelude
       , test_imaginary
+      , test_misc
       ]
 

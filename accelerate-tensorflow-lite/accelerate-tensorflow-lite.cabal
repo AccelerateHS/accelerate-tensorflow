@@ -93,6 +93,7 @@ test-suite nofib-tensorflow-lite
       Data.Array.Accelerate.Test.NoFib.Prelude.Map
       Data.Array.Accelerate.Test.NoFib.Prelude.ZipWith
       Data.Array.Accelerate.Test.NoFib.Prelude.Foreign
+      Data.Array.Accelerate.Test.NoFib.Misc
       Paths_accelerate_tensorflow_lite
   hs-source-dirs:
       test/nofib

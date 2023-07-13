@@ -58,7 +58,7 @@ prop_saxpy e =
   property $ do
     sh  <- forAll dim1
     dat <- forAllWith (const "sample-data") (generate_sample_data_saxpy sh e)
-    α   <- forAll (e ForInput `except` \v -> v P.== 0) -- otherwise the xs node is pruned and conversion to TFLite fails
+    α   <- forAll (e ForInput)
     xs  <- forAll (array ForInput sh e)
     ys  <- forAll (array ForInput sh e)
     let
