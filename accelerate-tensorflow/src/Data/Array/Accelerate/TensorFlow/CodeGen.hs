@@ -246,7 +246,7 @@ buildOpenAcc aenv (OpenAcc pacc) =
             sh' :: TensorShape sh
             sh' = buildOpenExp ShapeRz () Empty aenv sh
             ranges = buildOpenExp shR sh' (Empty `push` (LeftHandSideSingle scalarTypeInt, TF.reshape linearRange (shapeToTensor shR sh'))) aenv $ 
-              FromIndex shR (weakenE weakenEmpty sh) (PrimApp (PrimFromIntegral integralType numType) $ Evar $ Var scalarTypeInt ZeroIdx)
+              FromIndex shR (weakenE weakenEmpty sh) (Evar $ Var scalarTypeInt ZeroIdx)
 
 
       replicateL
