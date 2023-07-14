@@ -37,8 +37,8 @@ import Test.Tasty.Hedgehog
 import Prelude                                                      as P
 
 
-test_zipWith :: TestTree
-test_zipWith =
+test_zipWith :: ConverterPy -> TestTree
+test_zipWith converter =
   testGroup "zipWith"
     [ testDim dim0
     , testDim dim1
@@ -50,28 +50,29 @@ test_zipWith =
               -> TestTree
       testDim dim =
         testGroup ("DIM" P.++ show (rank @sh))
-          [ testProperty "add" $ prop_zipWith (+) dim f32
-          , testProperty "sub" $ prop_zipWith (-) dim f32
-          , testProperty "mul" $ prop_zipWith (*) dim f32
-          , testProperty "min" $ prop_zipWith A.min dim f32
-          , testProperty "max" $ prop_zipWith A.max dim f32
+          [ testProperty "add" $ prop_zipWith converter (+) dim f32
+          , testProperty "sub" $ prop_zipWith converter (-) dim f32
+          , testProperty "mul" $ prop_zipWith converter (*) dim f32
+          , testProperty "min" $ prop_zipWith converter A.min dim f32
+          , testProperty "max" $ prop_zipWith converter A.max dim f32
           ]
 
 
 prop_zipWith
     :: (P.Eq sh, Show sh, Shape sh, Elt e, Show e, Similar e)
-    => (Exp e -> Exp e -> Exp e)
+    => ConverterPy
+    -> (Exp e -> Exp e -> Exp e)
     -> Gen sh
     -> (WhichData -> Gen e)
     -> Property
-prop_zipWith f dim e =
+prop_zipWith converter f dim e =
   property $ do
     sh  <- forAll dim
     dat <- forAllWith (const "sample-data") (generate_sample_data sh e)
     xs  <- forAll (array ForInput sh e)
     ys  <- forAll (array ForInput sh e)
     let !ref = I.runN (A.zipWith f)
-        !tpu = TPU.compile (A.zipWith f) dat
+        !tpu = TPU.compileWith converter (A.zipWith f) dat
     --
     TPU.execute tpu xs ys ~~~ ref xs ys
 

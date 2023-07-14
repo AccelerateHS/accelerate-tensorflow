@@ -38,8 +38,8 @@ import Test.Tasty.Hedgehog
 import Prelude                                                      as P
 
 
-test_dotp :: TestTree
-test_dotp =
+test_dotp :: ConverterPy -> TestTree
+test_dotp converter =
   testGroup "dotp"
     [ testElt f32
     ]
@@ -48,13 +48,14 @@ test_dotp =
               => (WhichData -> Gen e)
               -> TestTree
       testElt e =
-        testProperty (show (eltR @e)) $ prop_dotp e
+        testProperty (show (eltR @e)) $ prop_dotp converter e
 
 prop_dotp
     :: (A.Num e, Show e, Similar e)
-    => (WhichData -> Gen e)
+    => ConverterPy
+    -> (WhichData -> Gen e)
     -> Property
-prop_dotp e =
+prop_dotp converter e =
   property $ do
     sh  <- forAll dim1
     dat <- forAllWith (const "sample-data") (generate_sample_data_dotp sh e)
@@ -63,7 +64,7 @@ prop_dotp e =
     let
         dotp = A.sum $$ A.zipWith (*)
         !ref = I.runN dotp
-        !tpu = TPU.compile dotp dat
+        !tpu = TPU.compileWith converter dotp dat
     --
     TPU.execute tpu xs ys ~~~ ref xs ys
 

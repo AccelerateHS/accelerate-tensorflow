@@ -36,8 +36,8 @@ import Test.Tasty.Hedgehog
 import Prelude                                                      as P
 
 
-test_sasum :: TestTree
-test_sasum =
+test_sasum :: ConverterPy -> TestTree
+test_sasum converter =
   testGroup "sasum"
     [ testElt f32
     ]
@@ -46,13 +46,14 @@ test_sasum =
               => (WhichData -> Gen e)
               -> TestTree
       testElt e =
-        testProperty (show (eltR @e)) $ prop_sasum e
+        testProperty (show (eltR @e)) $ prop_sasum converter e
 
 prop_sasum
     :: (A.Num e, Show e, Similar e)
-    => (WhichData -> Gen e)
+    => ConverterPy
+    -> (WhichData -> Gen e)
     -> Property
-prop_sasum e =
+prop_sasum converter e =
   property $ do
     sh  <- forAll dim1
     dat <- forAll (generate_sample_data_sasum sh e)
@@ -60,7 +61,7 @@ prop_sasum e =
     let
         sasum = A.fold (+) 0 . A.map abs
         !ref  = I.runN sasum
-        !tpu  = TPU.compile sasum dat
+        !tpu  = TPU.compileWith converter sasum dat
     --
     TPU.execute tpu xs ~~~ ref xs
 

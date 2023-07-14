@@ -37,8 +37,8 @@ import Test.Tasty.Hedgehog
 import Prelude                                                      as P
 
 
-test_foreign :: TestTree
-test_foreign =
+test_foreign :: ConverterPy -> TestTree
+test_foreign converter =
   testGroup "foreign"
     [ testDim dim1
     , testDim dim2
@@ -50,39 +50,41 @@ test_foreign =
               -> TestTree
       testDim dim =
         testGroup ("DIM" P.++ show (rank @sh))
-          [ testProperty "argmin" $ prop_min dim f32
-          , testProperty "argmax" $ prop_max dim i16
+          [ testProperty "argmin" $ prop_min converter dim f32
+          , testProperty "argmax" $ prop_max converter dim i16
           ]
 
 prop_min
     :: (P.Eq sh, Show sh, Shape sh, Elt e, Show e, Similar e, A.Ord e)
-    => Gen (sh:.Int)
+    => ConverterPy
+    -> Gen (sh:.Int)
     -> (WhichData -> Gen e)
     -> Property
-prop_min dim e =
+prop_min converter dim e =
   property $ do
     sh  <- forAll dim
     dat <- forAll (generate_sample_data sh e)
     xs  <- forAll (array ForInput sh e)
     let !f   = argMin
         !ref = I.runN f
-        !tpu = TPU.compile f dat
+        !tpu = TPU.compileWith converter f dat
     --
     TPU.execute tpu xs ~~~ ref xs
 
 prop_max
     :: (P.Eq sh, Show sh, Shape sh, Elt e, Show e, Similar e, A.Ord e)
-    => Gen (sh:.Int)
+    => ConverterPy
+    -> Gen (sh:.Int)
     -> (WhichData -> Gen e)
     -> Property
-prop_max dim e =
+prop_max converter dim e =
   property $ do
     sh  <- forAll dim
     dat <- forAll (generate_sample_data sh e)
     xs  <- forAll (array ForInput sh e)
     let !f   = argMax
         !ref = I.runN f
-        !tpu = TPU.compile f dat
+        !tpu = TPU.compileWith converter f dat
     --
     TPU.execute tpu xs ~~~ ref xs
 

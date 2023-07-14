@@ -36,8 +36,8 @@ import Test.Tasty.Hedgehog
 import Prelude                                                      as P
 
 
-test_map :: TestTree
-test_map =
+test_map :: ConverterPy -> TestTree
+test_map converter =
   testGroup "map"
     [ testDim dim0
     , testDim dim1
@@ -49,26 +49,27 @@ test_map =
               -> TestTree
       testDim dim =
         testGroup ("DIM" P.++ show (rank @sh))
-          [ testProperty "plus1" $ prop_map (+1) dim i64
-          , testProperty "sin"   $ prop_map sin dim f32
-          , testProperty "cos"   $ prop_map cos dim f32
-          , testProperty "sqrt"  $ prop_map sqrt dim (fmap abs . f32)
+          [ testProperty "plus1" $ prop_map converter (+1) dim i64
+          , testProperty "sin"   $ prop_map converter sin dim f32
+          , testProperty "cos"   $ prop_map converter cos dim f32
+          , testProperty "sqrt"  $ prop_map converter sqrt dim (fmap abs . f32)
           ]
 
 
 prop_map
     :: (P.Eq sh, Show sh, Shape sh, Elt e, Show e, Similar e)
-    => (Exp e -> Exp e)
+    => ConverterPy
+    -> (Exp e -> Exp e)
     -> Gen sh
     -> (WhichData -> Gen e)
     -> Property
-prop_map f dim e =
+prop_map converter f dim e =
   property $ do
     sh  <- forAll dim
     dat <- forAll (generate_sample_data sh e)
     xs  <- forAll (array ForInput sh e)
     let !ref = I.runN (A.map f)
-        !tpu = TPU.compile (A.map f) dat
+        !tpu = TPU.compileWith converter (A.map f) dat
     --
     TPU.execute tpu xs ~~~ ref xs
 

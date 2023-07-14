@@ -18,17 +18,19 @@ import Data.Array.Accelerate.Test.NoFib.Prelude.Map
 import Data.Array.Accelerate.Test.NoFib.Prelude.ZipWith
 import Data.Array.Accelerate.Test.NoFib.Prelude.Foreign
 
+import Data.Array.Accelerate.TensorFlow.Lite (ConverterPy)
+
 import Test.Tasty
 
 
-test_prelude :: TestTree
-test_prelude =
+test_prelude :: ConverterPy -> TestTree
+test_prelude converter =
   testGroup "prelude"
-    [ test_map
-    , test_zipWith
-    , test_fold
-    , test_backpermute
-    , test_generate
-    , test_foreign
+    [ test_map converter
+    , test_zipWith converter
+    , test_fold converter
+    , test_backpermute converter
+    , test_generate converter
+    , test_foreign converter
     ]
 

@@ -15,13 +15,15 @@ import Data.Array.Accelerate.Test.NoFib.Imaginary.DotP
 import Data.Array.Accelerate.Test.NoFib.Imaginary.SASUM
 import Data.Array.Accelerate.Test.NoFib.Imaginary.SAXPY
 
+import Data.Array.Accelerate.TensorFlow.Lite                        ( ConverterPy )
+
 import Test.Tasty
 
-test_imaginary :: TestTree
-test_imaginary =
+test_imaginary :: ConverterPy -> TestTree
+test_imaginary converter =
   testGroup "imaginary"
-    [ test_saxpy
-    , test_sasum
-    , test_dotp
+    [ test_saxpy converter
+    , test_sasum converter
+    , test_dotp converter
     ]
 

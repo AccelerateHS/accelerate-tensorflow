@@ -33,14 +33,14 @@ import Test.Tasty.Hedgehog
 import Prelude                                                      as P
 
 
-test_misc :: TestTree
-test_misc =
+test_misc :: ConverterPy -> TestTree
+test_misc converter =
   testGroup "misc"
-    [ test_arguments
+    [ test_arguments converter
     ]
 
-test_arguments :: TestTree
-test_arguments =
+test_arguments :: ConverterPy -> TestTree
+test_arguments converter =
   testGroup "arguments"
     [ testDim dim0
     , testDim dim1
@@ -52,15 +52,16 @@ test_arguments =
               -> TestTree
       testDim dim =
         testGroup ("DIM" P.++ show (rank @sh))
-          [ testProperty "missing" $ prop_missing_args dim f32
+          [ testProperty "missing" $ prop_missing_args converter dim f32
           ]
 
 prop_missing_args
     :: (P.Eq sh, Show sh, Shape sh, Elt e, Show e, Similar e, A.Num e)
-    => Gen sh
+    => ConverterPy
+    -> Gen sh
     -> (WhichData -> Gen e)
     -> Property
-prop_missing_args dim e =
+prop_missing_args converter dim e =
   property $ do
     sh   <- forAll dim
 
@@ -90,6 +91,6 @@ prop_missing_args dim e =
               in P.sum $ P.zipWith (\b x -> if b then x else 0) mask values
 
     let !ref = I.runN (A.zipWith4 f)
-        !tpu = TPU.compile (A.zipWith4 f) dat
+        !tpu = TPU.compileWith converter (A.zipWith4 f) dat
 
     TPU.execute tpu inp1 inp2 inp3 inp4 ~~~ ref inp1 inp2 inp3 inp4

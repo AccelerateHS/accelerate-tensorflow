@@ -37,8 +37,8 @@ import Test.Tasty.Hedgehog
 import Prelude                                                      as P
 
 
-test_fold :: TestTree
-test_fold =
+test_fold :: ConverterPy -> TestTree
+test_fold converter =
   testGroup "fold"
     [ testDim dim1'
     , testDim dim2'
@@ -50,44 +50,46 @@ test_fold =
               -> TestTree
       testDim dim =
         testGroup ("DIM" P.++ show (rank @(sh :. Int)))
-          [ testProperty "sum"     $ prop_fold (+) 0 dim f32
-          , testProperty "product" $ prop_fold1 (*) dim f32
-          , testProperty "minimum" $ prop_fold1 A.min dim f32
-          , testProperty "maximum" $ prop_fold1 A.max dim f32
+          [ testProperty "sum"     $ prop_fold converter (+) 0 dim f32
+          , testProperty "product" $ prop_fold1 converter (*) dim f32
+          , testProperty "minimum" $ prop_fold1 converter A.min dim f32
+          , testProperty "maximum" $ prop_fold1 converter A.max dim f32
           ]
 
 prop_fold
     :: (P.Eq sh, Show sh, Shape sh, A.Num e, Show e, Similar e)
-    => (Exp e -> Exp e -> Exp e)
+    => ConverterPy
+    -> (Exp e -> Exp e -> Exp e)
     -> Exp e
     -> Gen (sh :. Int)
     -> (WhichData -> Gen e)
     -> Property
-prop_fold f z dim e =
+prop_fold converter f z dim e =
   property $ do
     sh  <- forAll dim
     dat <- forAll (generate_sample_data sh e)
     xs  <- forAll (array ForInput sh e)
     let acc  = A.fold f z
         !ref = I.runN acc
-        !tpu = TPU.compile acc dat
+        !tpu = TPU.compileWith converter acc dat
     --
     TPU.execute tpu xs ~~~ ref xs
 
 prop_fold1
     :: (P.Eq sh, Show sh, Shape sh, A.Num e, Show e, Similar e)
-    => (Exp e -> Exp e -> Exp e)
+    => ConverterPy
+    -> (Exp e -> Exp e -> Exp e)
     -> Gen (sh :. Int)
     -> (WhichData -> Gen e)
     -> Property
-prop_fold1 f dim e =
+prop_fold1 converter f dim e =
   property $ do
     sh  <- forAll (dim `except` \sh -> S.size sh P.== 0)
     dat <- forAll (generate_sample_data sh e)
     xs  <- forAll (array ForInput sh e)
     let acc  = A.fold1 f
         !ref = I.runN acc
-        !tpu = TPU.compile acc dat
+        !tpu = TPU.compileWith converter acc dat
     --
     TPU.execute tpu xs ~~~ ref xs
 

@@ -36,6 +36,7 @@ library
   other-modules:
       Data.Array.Accelerate.TensorFlow.Lite.CodeGen
       Data.Array.Accelerate.TensorFlow.Lite.Compile
+      Data.Array.Accelerate.TensorFlow.Lite.ConverterPy
       Data.Array.Accelerate.TensorFlow.Lite.Model
       Data.Array.Accelerate.TensorFlow.Lite.Representation.Args
       Data.Array.Accelerate.TensorFlow.Lite.Representation.Shapes
@@ -75,6 +76,7 @@ library
     , tensorflow-ops
     , tensorflow-proto
     , text
+    , unix
     , vector
   default-language: Haskell2010
 

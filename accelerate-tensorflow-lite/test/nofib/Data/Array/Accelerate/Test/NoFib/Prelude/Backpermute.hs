@@ -35,8 +35,8 @@ import Test.Tasty.Hedgehog
 import Prelude                                                      as P
 
 
-test_backpermute :: TestTree
-test_backpermute =
+test_backpermute :: ConverterPy -> TestTree
+test_backpermute converter =
   testGroup "backpermute"
     [ testDIM2
     ]
@@ -44,20 +44,21 @@ test_backpermute =
       testDIM2 :: TestTree
       testDIM2 =
         testGroup "DIM2"
-          [ testProperty "transpose" $ prop_transpose f32
+          [ testProperty "transpose" $ prop_transpose converter f32
           ]
 
 prop_transpose
     :: (Elt e, Show e, Similar e)
-    => (WhichData -> Gen e)
+    => ConverterPy
+    -> (WhichData -> Gen e)
     -> Property
-prop_transpose e =
+prop_transpose converter e =
   property $ do
     sh  <- forAll dim2
     dat <- forAllWith (const "sample-data") (generate_sample_data_transpose sh e)
     xs  <- forAll (array ForInput sh e)
     let !ref = I.runN A.transpose
-        !tpu = TPU.compile A.transpose dat
+        !tpu = TPU.compileWith converter A.transpose dat
     --
     TPU.execute tpu xs ~~~ ref xs
 

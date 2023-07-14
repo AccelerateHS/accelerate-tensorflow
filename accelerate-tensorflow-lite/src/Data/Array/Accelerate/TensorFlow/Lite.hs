@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleInstances        #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE GADTs                    #-}
-{-# LANGUAGE FlexibleContexts          #-}
+{-# LANGUAGE FlexibleContexts         #-}
 {-# LANGUAGE RecordWildCards          #-}
 {-# LANGUAGE ScopedTypeVariables      #-}
 {-# LANGUAGE TypeApplications         #-}
@@ -23,6 +23,13 @@ module Data.Array.Accelerate.TensorFlow.Lite (
   encodeModel, decodeModel,
 
   compile,
+  compileWith,
+  ConverterPy,
+  withConverterPy,
+  withConverterPy',
+  ConverterSettings(..),
+  defaultConverterSettings,
+
   execute,
   withDeviceContext,
 
@@ -46,13 +53,12 @@ import qualified Data.Array.Accelerate.Representation.Array                   as
 import qualified Data.Array.Accelerate.Smart                                  as Smart
 
 import Data.Array.Accelerate.TensorFlow.TypeDicts
-import qualified Data.Array.Accelerate.TensorFlow.CodeGen.AST
-import Data.Array.Accelerate.TensorFlow.CodeGen.Base
 
 import Data.Array.Accelerate.TensorFlow
 
 import Data.Array.Accelerate.TensorFlow.Lite.CodeGen
 import Data.Array.Accelerate.TensorFlow.Lite.Compile
+import Data.Array.Accelerate.TensorFlow.Lite.ConverterPy
 import Data.Array.Accelerate.TensorFlow.Lite.Model
 import Data.Array.Accelerate.TensorFlow.Lite.Sugar.Args
 import Data.Array.Accelerate.TensorFlow.Lite.Sugar.Shapes
@@ -98,9 +104,21 @@ type RepresentativeData f = [Args f]
 -- The compiled model can then be evaluated using 'execute' or serialised
 -- using 'encodeModel'.
 --
-compile :: forall f. (Afunction f) => f -> RepresentativeData (AfunctionR f) -> Model (AfunctionR f)
-compile acc args = unsafePerformIO $ do
-  Model afunR (modelAfun afunR tfun x) <$> compileTfunWith tfun argsnames (x:xs)
+compile :: forall f. Afunction f => f -> RepresentativeData (AfunctionR f) -> Model (AfunctionR f)
+compile acc args =
+  unsafePerformIO $ do
+    withConverterPy $ \converter ->
+      compileWith' converter acc args
+
+-- | The same as 'compile', but with an explicit running converter.py instance.
+-- Sharing a converter.py instance over multiple compilations saves Python and
+-- TensorFlow startup time.
+compileWith :: forall f. Afunction f => ConverterPy -> f -> RepresentativeData (AfunctionR f) -> Model (AfunctionR f)
+compileWith converter acc args = unsafePerformIO $ compileWith' converter acc args
+
+compileWith' :: forall f. Afunction f => ConverterPy -> f -> RepresentativeData (AfunctionR f) -> IO (Model (AfunctionR f))
+compileWith' converter acc args = do
+  Model afunR (modelAfun afunR tfun x) <$> compileTfunIn converter tfun argsnames (x:xs)
   where
     !afunR = afunctionRepr @f
     !afun  = simplifyAfun (convertAfun acc)

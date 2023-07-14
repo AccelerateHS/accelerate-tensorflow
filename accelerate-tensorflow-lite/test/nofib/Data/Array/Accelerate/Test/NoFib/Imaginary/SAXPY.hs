@@ -38,8 +38,8 @@ import Control.Monad
 import Prelude                                                      as P
 
 
-test_saxpy :: TestTree
-test_saxpy =
+test_saxpy :: ConverterPy -> TestTree
+test_saxpy converter =
   testGroup "saxpy"
     [ testElt f32
     ]
@@ -48,13 +48,14 @@ test_saxpy =
               => (WhichData -> Gen e)
               -> TestTree
       testElt e =
-        testProperty (show (eltR @e)) $ prop_saxpy e
+        testProperty (show (eltR @e)) $ prop_saxpy converter e
 
 prop_saxpy
     :: (P.Eq e, P.Num e, A.Num e, Show e, Similar e)
-    => (WhichData -> Gen e)
+    => ConverterPy
+    -> (WhichData -> Gen e)
     -> Property
-prop_saxpy e =
+prop_saxpy converter e =
   property $ do
     sh  <- forAll dim1
     dat <- forAllWith (const "sample-data") (generate_sample_data_saxpy sh e)
@@ -64,7 +65,7 @@ prop_saxpy e =
     let
         saxpy = A.zipWith (\x y -> constant α * x + y)
         !ref  = I.runN saxpy
-        !tpu  = TPU.compile saxpy dat
+        !tpu  = TPU.compileWith converter saxpy dat
     --
     TPU.execute tpu xs ys ~~~ ref xs ys
 

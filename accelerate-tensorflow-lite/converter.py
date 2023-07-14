@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 
-import sys
+import sys, os
 import struct
 
 
@@ -52,6 +52,41 @@ def read_datatype(f):
     t = read_word8(f)
     return switch.get(t)
 
+# command -> (1::word8) job_spec          # run a job
+#          | (2::word8)                   # exit
+# job_spec -> graph_def_file input_arrays output_arrays data_file
+# graph_def_file -> filename              # pb_file
+# input_arrays -> list[node_name]         # input arrays of the model
+# output_arrays -> list[node_name]        # output arrays of the model
+# data_file -> filename                   # representative data file (see parse_representative_data_file)
+# filename -> list[word8]                 # filename interpreted in UTF8
+# node_name -> list[word8]                # node name interpreted in ASCII
+#
+# On completion of a job, the tflite file is written to the output FD as a list[word8].
+def read_stdin_command(f):
+    command = read_word8(f)
+    if command == 1:
+        return ("job", read_job_spec(f))
+    elif command == 2:
+        return ("exit", None)
+    else:
+        sys.exit(1)
+
+def read_job_spec(f):
+    graph_def_file = read_filename(f)
+    input_arrays = read_list(f, read_node_name)
+    output_arrays = read_list(f, read_node_name)
+    data_file = read_filename(f)
+    return (graph_def_file, input_arrays, output_arrays, data_file)
+
+def read_filename(f):
+    s = read_list(f, read_word8)
+    return bytearray(s).decode("utf8")
+
+def read_node_name(f):
+    s = read_list(f, read_word8)
+    return bytearray(s).decode("ascii")
+
 def read_word64le(f):
     b = bytearray(8)
     f.readinto(b)
@@ -69,38 +104,11 @@ def read_list(f, reader, lazy=False):
     else: return list(result_iter)
 
 
-# Parses command-line arguments
-#
-# Options are:
-#   --graph_def_file= pb_file
-#   --output_file= tflite_file
-#   --input_arrays=  comma-separated list of names of  input arrays
-#   --output_arrays= comma-separated list of names of output arrays
-#   --data_file= representative_data_file (see parse_representative_data_file)
-#
-# TODO: the following changes need to happen at some point:
-#    1. sanitize the data in in_arrs and out_arrs before setting their values.
-#
-def parse_args(args):
-    graph_def = ""
-    outfile   = ""
-    data_file = ""
-    in_arrs   = ""
-    out_arrs  = ""
-
-    for arg in args:
-        if arg.startswith('--graph_def_file='):  graph_def = arg[17:]
-        elif arg.startswith('--output_file='):   outfile = arg[14:]
-        elif arg.startswith('--data_file='):     data_file = arg[12:]
-        elif arg.startswith('--input_arrays='):  in_arrs = arg[15:].split(",")
-        elif arg.startswith('--output_arrays='): out_arrs = arg[16:].split(",")
-
-    return (graph_def, outfile, in_arrs, out_arrs, data_file)
+def build_word64le(x):
+    return struct.pack("<q", x)
 
 
-def main():
-    in_file, out_file, inputs, outputs, data_file = parse_args(sys.argv)
-
+def handle_job(outfd, in_file, inputs, outputs, data_file):
     converter = tf.compat.v1.lite.TFLiteConverter.from_frozen_graph(
         graph_def_file=in_file,
         input_arrays=inputs,
@@ -115,8 +123,29 @@ def main():
         lambda: parse_representative_data_file(data_file))
 
     tflite_model = converter.convert()
-    with tf.io.gfile.GFile(out_file, 'wb') as f:
-        f.write(tflite_model)
+
+    # Write the tflite model as a list[word8] to stdout; use sys.stdout.buffer to write binary data
+    outfd.write(build_word64le(len(tflite_model)))
+    outfd.write(tflite_model)
+    outfd.flush()
+
+def handle_command(outfd):
+    (command, cmdval) = read_stdin_command(sys.stdin.buffer)
+    if command == "job":
+        handle_job(outfd, *cmdval)
+    elif command == "exit":
+        sys.exit(0)
+    else:
+        assert False
+
+def main():
+    if len(sys.argv) != 2:
+        print("Usage: converter.py <output FD>", file=sys.stderr)
+        sys.exit(1)
+
+    with os.fdopen(int(sys.argv[1]), "wb") as outfd:
+        while True:
+            handle_command(outfd)
 
 
 if __name__ == "__main__":
