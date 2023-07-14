@@ -1,5 +1,5 @@
-
 #include <iostream>
+#include <mutex>
 #include <cstring>
 #include <cstdint>
 
@@ -74,6 +74,41 @@ BuildEdgeTpuInterpreter
   return interpreter;
 }
 
+// Global context, protected by a mutex. Opened and closed by withDeviceContext
+// in Haskell code, and edgetpu_open_device_context and
+// edgetpu_close_device_context in C land.
+static std::mutex g_edgetpu_context_mutex;
+static std::shared_ptr<edgetpu::EdgeTpuContext> g_edgetpu_context = nullptr;
+
+// Returns:
+// * 0 if successfully opened
+// * 1 if already open, nothing done
+// * 2 if opening failed due to an error
+extern "C" int64_t edgetpu_open_device_context() {
+  std::lock_guard<std::mutex> lock{g_edgetpu_context_mutex};
+  if (g_edgetpu_context) return 1;
+
+  std::shared_ptr<edgetpu::EdgeTpuContext> context = edgetpu::EdgeTpuManager::GetSingleton()->OpenDevice();
+  if (context == nullptr) return 2;
+
+  g_edgetpu_context = std::move(context);
+  return 0;
+}
+
+// Closes the context opened with edgetpu_open_device_context, if any.
+extern "C" void edgetpu_close_device_context() {
+  std::lock_guard<std::mutex> lock{g_edgetpu_context_mutex};
+  g_edgetpu_context.reset();
+}
+
+// Gets the context opened with edgetpu_open_device_context, or opens a new
+// context if there is none such.
+static std::shared_ptr<edgetpu::EdgeTpuContext> get_context() {
+  std::lock_guard<std::mutex> lock{g_edgetpu_context_mutex};
+  if (g_edgetpu_context) return g_edgetpu_context;
+  else return edgetpu::EdgeTpuManager::GetSingleton()->OpenDevice();
+}
+
 // Returns 0 on success, 1 on failure.
 extern "C"
 int64_t
@@ -97,7 +132,7 @@ edgetpu_run
   DEBUG("[edgetpu.cc] Getting device context");
 
   // Get EdgeTPU context
-  std::shared_ptr<edgetpu::EdgeTpuContext> context = edgetpu::EdgeTpuManager::GetSingleton()->OpenDevice();
+  std::shared_ptr<edgetpu::EdgeTpuContext> context = get_context();
 
   DEBUG("[edgetpu.cc] Building interpreter");
 

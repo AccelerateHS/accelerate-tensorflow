@@ -17,10 +17,13 @@ import Data.Array.Accelerate.Test.NoFib.Prelude
 import Data.Array.Accelerate.Test.NoFib.Imaginary
 import Data.Array.Accelerate.Test.NoFib.Misc
 
+import Data.Array.Accelerate.TensorFlow.Lite (withDeviceContext)
+
 
 main :: IO ()
 main
-  = defaultMain
+  = withDeviceContext
+  $ defaultMain
   $ localOption (HedgehogTestLimit (Just 5))
   $ localOption (HedgehogShrinkLimit (Just 0))
   $ testGroup "nofib-tensorflow-lite"

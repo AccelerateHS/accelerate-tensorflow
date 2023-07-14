@@ -24,6 +24,7 @@ module Data.Array.Accelerate.TensorFlow.Lite (
 
   compile,
   execute,
+  withDeviceContext,
 
   argMin, argMax
 
@@ -58,6 +59,7 @@ import Data.Array.Accelerate.TensorFlow.Lite.Sugar.Shapes
 import qualified Data.Array.Accelerate.TensorFlow.Lite.Representation.Args    as R
 import qualified Data.Array.Accelerate.TensorFlow.Lite.Representation.Shapes  as R
 
+import Control.Exception                                                      ( bracket )
 import Control.Monad.State
 import Data.List                                                              ( genericLength )
 import Foreign.C.String
@@ -127,6 +129,15 @@ compile acc args = unsafePerformIO $ do
 -- >
 -- > result :: Vector Word8
 -- > result = execute m xs ys
+--
+-- **Note about contexts**:
+-- If a TPU device context has not yet been acquired using 'withDeviceContext',
+-- 'execute' will open a new device context just for this evaluation and close
+-- it when the computation is finished. Opening a new device context is very
+-- slow (about 2.6 seconds on our system), so if you care about performance, it
+-- is probably worth doing it once only.
+--
+-- TODO: Is the TPU usable by other processes while we have a context open?
 --
 execute :: Model f -> f
 execute (Model afunR fun buffer) = eval afunR fun 0 []
@@ -204,6 +215,34 @@ execute (Model afunR fun buffer) = eval afunR fun 0 []
     eval _ _ _ _ = error "impossible"
 
 
+-- | Open a TPU device context
+--
+-- Inside the IO action passed to 'withDeviceContext', a TPU device context
+-- will be kept open. This context will be used by 'execute', removing most of
+-- the (roughly 2.6 seconds!) overhead of running a TPU computation, leaving
+-- mostly just the computation itself.
+--
+-- This function is thread-safe and idempotent (i.e. nesting it multiple times
+-- is okay; any inner calls will not take effect).
+--
+-- It is not necessary to call this function; 'execute' will create a device
+-- context (and close it immediately after its computation is done) if none was
+-- open yet. However, opening a context is very slow, so using
+-- 'withDeviceContext' is worth it for performance.
+--
+-- TODO: Is the TPU usable by other processes while we have a context open?
+--
+withDeviceContext :: IO a -> IO a
+withDeviceContext action =
+  bracket (do opened <- edgetpu_open_device_context
+              case opened of
+                0 -> return edgetpu_close_device_context
+                1 -> return (return ())
+                _ -> ioError (userError "withDeviceContext: Error opening TPU device context"))
+          (\closer -> closer)
+          (\_ -> action)
+
+
 data Feed = Feed { tensorName      :: String
                  , tensorType      :: Word8
                  , tensorDataBytes :: ForeignPtr Word8
@@ -220,6 +259,7 @@ withFeeds feeds k =
   withArray ts                                        $ \tp ->
     k np kp tp sp (genericLength feeds)
 
+-- cbits/edgetpu.cc
 foreign import ccall "edgetpu_run"
     edgetpu_run
         :: CString              -- model_buffer
@@ -231,3 +271,11 @@ foreign import ccall "edgetpu_run"
         -> Int64                -- tensor_count
         -> IO Int64             -- 0 on success
 
+-- cbits/edgetpu.cc
+-- Returns 0 if ok, 1 if already open, 2 on error
+foreign import ccall "edgetpu_open_device_context"
+    edgetpu_open_device_context :: IO Int64
+
+-- cbits/edgetpu.cc
+foreign import ccall "edgetpu_close_device_context"
+    edgetpu_close_device_context :: IO ()

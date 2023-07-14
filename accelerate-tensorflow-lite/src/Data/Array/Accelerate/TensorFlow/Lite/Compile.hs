@@ -138,6 +138,7 @@ tflite_model graph xs = do
                 ]
 
   -- Invoke 'tflite_convert' to convert the protobuf file to the tflite representation
+  -- TODO: This python invoke is quite SLOW (about 1.35 seconds)
   withCreateProcess cp $ \Nothing Nothing (Just errh) ph -> do
 
     -- fork off threads to start consuming stdout and stderr
