@@ -42,7 +42,8 @@ test_generate converter =
     [ testDim dim0
     , testDim dim1
     , testDim dim2
-    , testProperty "fromintegral" $ prop_generate converter (\(I1 i)-> A.fromIntegral @Int @Int32 i) dim1
+    , testProperty "fromintegral" $ prop_generate converter (\(I1 i) -> A.fromIntegral @Int @Int32 i) dim1
+    , testProperty "genid" $ prop_generate converter (\(I1 i) -> I1 i) dim1
     ]
     where
       testDim :: forall sh. (Shape sh, Show sh, P.Eq sh, Similar sh)
@@ -54,6 +55,9 @@ test_generate converter =
           , testProperty "fill16" $ prop_fill converter dim i16
           , testProperty "fill8" $ prop_fill converter dim i8
           , testProperty "mod19" $ prop_mod19 converter dim
+          , testProperty "noop_i32" $ prop_noop converter dim i32
+          , testProperty "noop_i64" $ prop_noop converter dim i64
+          , testProperty "noop_f32" $ prop_noop converter dim f32
           ]
 
 prop_fill
@@ -97,6 +101,28 @@ prop_generate converter g dim =
         !tpu = TPU.compileWith converter f dat
     --
     TPU.execute tpu ~~~ ref
+
+
+prop_noop
+    :: forall sh e . (P.Eq sh, Show sh, Shape sh, Elt e, Similar e, Show e, P.Eq e)
+    => ConverterPy
+    -> Gen sh
+    -> (WhichData -> Gen e)
+    -> Property
+prop_noop converter dim e =
+  property $ do
+    sh  <- forAll dim
+    dat <- forAll (do i  <- Gen.int (Range.linear 10 16)
+                      xs <- Gen.list (Range.singleton i) (array ForSample sh e)
+                      return [ x :-> Result sh | x <- xs ])
+    inp <- forAll (array ForInput sh e)
+
+    let f :: Acc (Array sh e) -> Acc (Array sh e)
+        f xs = xs
+        !ref = I.runN f
+        !tpu = TPU.compileWith converter f dat
+    --
+    TPU.execute tpu inp ~~~ ref inp
 
 
 prop_mod19
