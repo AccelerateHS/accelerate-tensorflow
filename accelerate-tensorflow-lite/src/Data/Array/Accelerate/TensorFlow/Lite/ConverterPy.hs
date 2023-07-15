@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 module Data.Array.Accelerate.TensorFlow.Lite.ConverterPy (
   ConverterPy,
   withConverterPy,
@@ -11,7 +12,7 @@ import qualified Proto.Tensorflow.Core.Framework.Graph              as TF
 import qualified Proto.Tensorflow.Core.Framework.Graph_Fields       as TF
 import qualified Proto.Tensorflow.Core.Framework.NodeDef_Fields     as TF
 
-import Control.Concurrent                                           ( forkIO )
+import Control.Concurrent                                           ( forkIO, threadDelay )
 import Control.Exception
 import Control.Monad                                                ( when, forM_ )
 import Data.ByteString                                              ( ByteString )
@@ -50,8 +51,11 @@ import Paths_accelerate_tensorflow_lite
 --
 -- Every distinct 'ConverterPy' represents a distinct process. Access to these
 -- processes is NOT thread-safe! See 'runConverterJob' for details.
-data ConverterPy = ConverterPy ConverterSettings (IORef CPImpl)
--- This is an IORef so that we can mutate the contents in-place.
+data ConverterPy = ConverterPy ConverterSettings (IORef (Maybe CPImpl))
+-- This is an IORef so that we can mutate the contents in-place. Nothing
+-- indicates that no process has been started yet; presumably the last job
+-- failed, and we want to wait until a new job happens to start a new
+-- converter. Just indiates a running process.
 
 data CPImpl = CPImpl
     ProcessHandle
@@ -118,20 +122,22 @@ openConverterPy settings = do
                 loop
       in loop
 
-  cpref <- newIORef (CPImpl ph inh outpipe0 errstream)
+  cpref <- newIORef (Just (CPImpl ph inh outpipe0 errstream))
   return (ConverterPy settings cpref)
 
 closeConverterPy :: ConverterPy -> IO ()
-closeConverterPy (ConverterPy _ cpref) = do
-  CPImpl ph inh _ errstream <- readIORef cpref
-  B.hPut inh (B.singleton 2)
-  hFlush inh
-  ex <- waitForProcess ph
-  case ex of
-    ExitFailure r -> do
-      errs <- readIORef errstream
-      error $ printf "converter.py exited with code %d\n%s" r (TE.decodeUtf8 (LB.toStrict errs))
-    ExitSuccess   -> return ()
+closeConverterPy (ConverterPy _ cpref) =
+  readIORef cpref >>= \case
+    Nothing -> return ()
+    Just (CPImpl ph inh _ errstream) -> do
+      B.hPut inh (B.singleton 2)
+      hFlush inh
+      ex <- waitForProcess ph
+      case ex of
+        ExitFailure r -> do
+          errs <- readIORef errstream
+          error $ printf "converter.py exited with code %d\n%s" r (TE.decodeUtf8 (LB.toStrict errs))
+        ExitSuccess   -> return ()
 
 -- | Returns the .tflite file contents as a binary blob.
 --
@@ -139,8 +145,8 @@ closeConverterPy (ConverterPy _ cpref) = do
 -- 'ConverterPy' objects simultaneously just fine, but do not use
 -- 'runConverterJob' concurrently on a single 'ConverterPy'.
 runConverterJob :: ConverterPy -> TF.GraphDef -> Builder -> IO ByteString
-runConverterJob converter@(ConverterPy _ cpref) graph reprdata = do
-  CPImpl _ inh outh stderrstream <- readIORef cpref
+runConverterJob converter graph reprdata = do
+  CPImpl _ inh outh stderrstream <- ensureConverter converter
   withTemporaryDirectory "acctflite-conv" $ \tmpdir -> do
     let graphFname = tmpdir </> "model.pb"
         dataFname = tmpdir </> "data.bin"
@@ -157,9 +163,13 @@ runConverterJob converter@(ConverterPy _ cpref) graph reprdata = do
 
     reslenBS <- B.hGet outh 8
     when (B.length reslenBS < 8) $ do
+      -- wait a bit for errors to accumulate
+      threadDelay 50000  -- 50ms
+      -- print errors
       errs <- readIORef stderrstream
       hPutStrLn stderr (LB8.unpack errs)
-      restartConverterPy converter
+      -- make sure the next job will start a new converter.py process
+      killConverterPy converter
       ioError (userError "Unexpected EOF from converter.py")
 
     -- hPutStrLn stderr $ "HS: reslenBS = " ++ show reslenBS
@@ -172,15 +182,28 @@ runConverterJob converter@(ConverterPy _ cpref) graph reprdata = do
 
     return tflitebuf
 
--- | Restart the process wrapped by this 'ConverterPy'. Not thread-safe with
--- 'runConverterJob'.
-restartConverterPy :: ConverterPy -> IO ()
-restartConverterPy (ConverterPy settings cpref) = do
-  CPImpl ph _ _ _ <- readIORef cpref
-  _ <- terminateImpatient ph
-  ConverterPy _ newcpref <- openConverterPy settings
-  -- replace the original
-  readIORef newcpref >>= atomicWriteIORef cpref
+ensureConverter :: ConverterPy -> IO CPImpl
+ensureConverter converter@(ConverterPy settings cpref) =
+  readIORef cpref >>= \case
+    Nothing -> do
+      ConverterPy _ newcpref <- openConverterPy settings
+      readIORef newcpref >>= atomicWriteIORef cpref
+      ensureConverter converter
+    Just cpimpl -> return cpimpl
+
+-- | Stop the currently-running process, if any, and set the 'CPImpl' to
+-- Nothing.
+killConverterPy :: ConverterPy -> IO ()
+killConverterPy (ConverterPy _ cpref) =
+  readIORef cpref >>= \case
+    Nothing -> return ()
+    Just (CPImpl ph _ _ _) -> do
+      -- don't wait on the process being terminated
+      _ <- forkIO $ do
+        _ <- terminateAfterAWhile ph
+        return ()
+      -- process stopped, so it's not available anymore
+      atomicWriteIORef cpref Nothing
 
 data JobSpec = JobSpec
     FilePath  -- ^ graph def file
@@ -207,10 +230,10 @@ fromWord64LE bs
   | otherwise = error "fromWord64LE: not length 8"
 
 -- | Returns exit code if it terminated soon enough
-terminateImpatient :: ProcessHandle -> IO (Maybe Int)
-terminateImpatient ph = do
+terminateAfterAWhile :: ProcessHandle -> IO (Maybe Int)
+terminateAfterAWhile ph = do
   -- timeout is in microseconds
-  ex <- timeout 200000 $ waitForProcess ph
+  ex <- timeout 300000 $ waitForProcess ph
   case ex of
     Nothing -> do  -- timeout
       terminateProcess ph
