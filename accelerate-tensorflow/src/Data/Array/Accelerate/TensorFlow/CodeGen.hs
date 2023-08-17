@@ -170,7 +170,7 @@ buildOpenAcc aenv (OpenAcc pacc) =
         let
             shape :: ShapeR sh -> sh -> TensorShape sh
             shape ShapeRz         ()     = ()
-            shape (ShapeRsnoc tR) (t, h) = (shape tR t, TF.constant (TF.Shape [1]) [fromIntegral h])
+            shape (ShapeRsnoc tR) (t, h) = (shape tR t, TF.constant (TF.Shape []) [fromIntegral h])
 
             array :: forall t'. TypeR t' -> ArrayData t' -> TensorArrayData t'
             array TupRunit ()             = ()
