@@ -72,7 +72,7 @@ buildOpenExp contextR context env aenv =
             go :: TypeR s -> TensorArrayData s -> TensorArrayData s -> TensorArrayData s
             go TupRunit         ()       ()       = ()
             go (TupRpair tA tB) (a1, b1) (a2, b2) = (go tA a1 a2, go tB b1 b2)
-            go (TupRsingle eR)  a        b        = buildTypeDictsScalar eR (TF.selectV2 p') a b
+            go (TupRsingle eR)  a        b        = buildTypeDictsScalar eR $ TF.selectV2 p' a b
         in
         go (expType t) t' e'
 
@@ -83,41 +83,22 @@ buildOpenExp contextR context env aenv =
       shapeSizeL ShapeRz () = constant contextR scalarTypeInt context 1
       shapeSizeL (ShapeRsnoc shr) (sh, n) = A.mul (IntegralNumType TypeInt) (n, shapeSizeL shr sh)
 
-
       gatherL :: Tensor sh e -> TensorArrayData Int -> TensorArrayData e
       gatherL (Tensor (ArrayR shr t) sh p) ix = case t of
-        TupRsingle t -> scalar t p ix
+        TupRsingle t ->
+          buildTypeDictsScalar t $
+            let n = shapeProd shr sh  -- 0D tensor containing full size of p
+                n1 = TF.reshape n (TF.constant (TF.Shape [1]) [1 :: ScalarTensorDataR Int])
+                pflattened = TF.reshape p n1
+            in TF.gather pflattened ix
         TupRunit -> ()
         TupRpair tl tr -> let (pl, pr) = p in ( gatherL (Tensor (ArrayR shr tl) sh pl) ix
                                               , gatherL (Tensor (ArrayR shr tr) sh pr) ix)
         where
-          scalar :: ScalarType s -> TensorArrayData s -> TensorArrayData Int -> TensorArrayData s
-          scalar (SingleScalarType s) = single s
-          scalar (VectorScalarType _) = unsupported "SIMD-vector types"
-
-          single :: SingleType s -> TensorArrayData s -> TensorArrayData Int -> TensorArrayData s
-          single (NumSingleType s) = num s
-
-          num :: NumType s -> TensorArrayData s -> TensorArrayData Int -> TensorArrayData s
-          num (IntegralNumType s) = integral s
-          num (FloatingNumType s) = floating s
-
-          integral :: IntegralType s -> TensorArrayData s -> TensorArrayData Int -> TensorArrayData s
-          integral TypeInt    = TF.gather
-          integral TypeInt8   = TF.gather
-          integral TypeInt16  = TF.gather
-          integral TypeInt32  = TF.gather
-          integral TypeInt64  = TF.gather
-          integral TypeWord   = TF.gather
-          integral TypeWord8  = TF.gather
-          integral TypeWord16 = TF.gather
-          integral TypeWord32 = TF.gather
-          integral TypeWord64 = TF.gather
-
-          floating :: FloatingType s -> TensorArrayData s -> TensorArrayData Int -> TensorArrayData s
-          floating TypeFloat  = TF.gather
-          floating TypeDouble = TF.gather
-          floating TypeHalf   = unsupported "half-precision floating point"
+          -- assumes tuple of zero-dimensional ints, and returns a zero-dimensional int
+          shapeProd :: ShapeR sh -> TensorShape sh -> TensorArrayData Int
+          shapeProd ShapeRz () = TF.constant (TF.Shape []) [1]
+          shapeProd (ShapeRsnoc shr) (sh, n) = A.mul (IntegralNumType TypeInt) (n, shapeProd shr sh)
   in
   \case
     Let lhs bnd body              -> buildOpenExp contextR context (env `push` (lhs, buildE bnd)) aenv body

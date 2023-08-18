@@ -65,7 +65,7 @@ buildOpenAfunWith aenv (Alam lhs f) (Aparam xR x xs)
 
               shape :: ShapeR sh -> sh -> TensorShape sh
               shape ShapeRz         ()     = ()
-              shape (ShapeRsnoc tR) (t, h) = (shape tR t, TF.constant (TF.Shape [1]) [fromIntegral h])
+              shape (ShapeRsnoc tR) (t, h) = (shape tR t, TF.constant (TF.Shape []) [fromIntegral h])
 
               array :: TypeR t -> State Int (TensorArrayData t, TupR ArgName t)
               array TupRunit         = return ((), TupRunit)
@@ -100,7 +100,7 @@ buildOpenAfunWith aenv (Abody f) (Aresult _ rsh)
               shape ShapeRz         ()     = return ()
               shape (ShapeRsnoc tR) (t, h) = do
                 h' <- state $ \j -> let opName  = TF.opName .~ TF.explicitName (T.pack (printf "output%d_shape%d" i j))
-                                        opShape = TF.opAttr "shape" .~ TF.Shape [1]
+                                        opShape = TF.opAttr "shape" .~ TF.Shape []
                                     in
                                     (TF.identity' (opShape . opName) h, j+1)
                 t' <- shape tR t
