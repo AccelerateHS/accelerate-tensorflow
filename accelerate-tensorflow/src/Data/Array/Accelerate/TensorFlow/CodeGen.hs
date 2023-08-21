@@ -323,7 +323,7 @@ buildOpenAcc aenv (OpenAcc pacc) =
             array :: TypeR t -> TensorArrayData t -> TensorArrayData t
             array TupRunit        () = ()
             array TupRpair{}      _  = unsupported "sum: product types"
-            array (TupRsingle aR) a  = buildTypeDictsScalar aR $ reduce a (TF.scalar @Int32 0)
+            array (TupRsingle aR) a  = buildTypeDictsScalar aR $ reduce a (TF.scalar @Int32 (-1))
         in
         Tensor (ArrayR shR' eR) sh' (array eR xs')
 
