@@ -134,7 +134,7 @@ buildOpenAfun aenv (Abody f) =
             array :: TypeR t -> TensorArrayData t -> State Int (TensorArrayData t)
             array TupRunit         ()     = return ()
             array (TupRpair aR bR) (a, b) = (,) <$> array aR a <*> array bR b
-            array (TupRsingle aR)  a      = buildTypeDictsScalar aR label a
+            array (TupRsingle aR)  a      = buildTypeDictsScalar aR $ label a
 
             label :: TF.TensorType t => TF.Tensor TF.Build t -> State Int (TF.Tensor TF.Build t)
             label t = state $ \j -> (TF.identity' (TF.opName .~ TF.explicitName (T.pack (printf "output%d_adata%d" i j))) t, j+1)
@@ -175,7 +175,7 @@ buildOpenAcc aenv (OpenAcc pacc) =
             array :: forall t'. TypeR t' -> ArrayData t' -> TensorArrayData t'
             array TupRunit ()             = ()
             array (TupRpair aR bR) (a, b) = (array aR a, array bR b)
-            array (TupRsingle aR) a       = buildTypeDictsScalar aR tensor a
+            array (TupRsingle aR) a       = buildTypeDictsScalar aR $ tensor a
               where
                 tensor :: forall s t. (Storable t, s ~ ScalarTensorDataR t, TF.TensorType s)
                        => UniqueArray t
@@ -277,7 +277,7 @@ buildOpenAcc aenv (OpenAcc pacc) =
             array :: TypeR s -> TensorArrayData s -> TensorArrayData s
             array TupRunit         ()     = ()
             array (TupRpair aR bR) (a, b) = (array aR a, array bR b)
-            array (TupRsingle aR)  a      = buildTypeDictsScalar aR (\s -> TF.tile (TF.reshape s sl_) sh_) a
+            array (TupRsingle aR)  a      = buildTypeDictsScalar aR $ TF.tile (TF.reshape a sl_) sh_
         in
         Tensor (ArrayR shR eR) sh' (array eR e')
 
@@ -323,7 +323,7 @@ buildOpenAcc aenv (OpenAcc pacc) =
             array :: TypeR t -> TensorArrayData t -> TensorArrayData t
             array TupRunit        () = ()
             array TupRpair{}      _  = unsupported "sum: product types"
-            array (TupRsingle aR) a  = buildTypeDictsScalar aR (\x -> reduce x (TF.scalar @Int32 0)) a
+            array (TupRsingle aR) a  = buildTypeDictsScalar aR $ reduce a (TF.scalar @Int32 0)
         in
         Tensor (ArrayR shR' eR) sh' (array eR xs')
 
@@ -384,7 +384,7 @@ buildOpenAcc aenv (OpenAcc pacc) =
             array :: TypeR t -> TensorArrayData t -> TensorArrayData t
             array TupRunit         ()     = ()
             array (TupRpair aR bR) (a, b) = (array aR a, array bR b)
-            array (TupRsingle aR)  a      = buildTypeDictsScalar aR (\x -> TF.transpose x (TF.constant @Int32 (TF.Shape [2]) [1,0])) a
+            array (TupRsingle aR)  a      = buildTypeDictsScalar aR $ TF.transpose a (TF.constant @Int32 (TF.Shape [2]) [1,0])
         in
         Tensor (ArrayR shR eR) (((), w), h) (array eR xs)
 
