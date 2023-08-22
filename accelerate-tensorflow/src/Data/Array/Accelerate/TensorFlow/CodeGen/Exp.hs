@@ -115,7 +115,7 @@ buildOpenExp contextR context env aenv =
     FromIndex shR sh i            -> let
         go :: ShapeR sh -> TensorArrayData sh -> TensorArrayData Int -> TensorArrayData sh
         go ShapeRz _ _ = ()
-        go (ShapeRsnoc shr) (sh,n) i = (go shr sh (A.rem TypeInt64 (i, n)), A.quot TypeInt64 (i, n))
+        go (ShapeRsnoc shr) (sh,n) i = (go shr sh (A.quot TypeInt64 (i, n)), A.rem TypeInt64 (i, n))
       in go shR (buildE sh) (buildE i)
     Cond p t e                    -> condL p t e
     Const tR c                    -> constant contextR tR context c
