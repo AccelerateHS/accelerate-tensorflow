@@ -16,6 +16,7 @@ import Test.Tasty.Hedgehog
 import Data.Array.Accelerate.Test.NoFib.Prelude
 import Data.Array.Accelerate.Test.NoFib.Imaginary
 import Data.Array.Accelerate.Test.NoFib.Misc
+import Data.Array.Accelerate.Test.NoFib.Unit
 
 import Data.Array.Accelerate.TensorFlow.Lite
 
@@ -34,5 +35,6 @@ main
       [ test_prelude converter
       , test_imaginary converter
       , test_misc converter
+      , test_unit converter
       ]
 
