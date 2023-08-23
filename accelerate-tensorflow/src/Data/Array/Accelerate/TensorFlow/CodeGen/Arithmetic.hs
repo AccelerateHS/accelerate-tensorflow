@@ -19,6 +19,7 @@ module Data.Array.Accelerate.TensorFlow.CodeGen.Arithmetic
 
 import Data.Array.Accelerate.TensorFlow.CodeGen.Base
 import Data.Array.Accelerate.TensorFlow.CodeGen.Tensor
+import qualified Data.Array.Accelerate.TensorFlow.CodeGen.Tensor.Shim as Sh
 
 import Data.Array.Accelerate.Type
 import Data.Array.Accelerate.AST                                    ( PrimBool )
@@ -27,6 +28,7 @@ import qualified TensorFlow.GenOps.Core                             as TF
 import qualified TensorFlow.Ops                                     as TF
 import qualified TensorFlow.Types                                   as TF
 
+import Data.Typeable                                                ( Typeable )
 import Prelude                                                      hiding ( uncurry, quot, rem, div, mod, log )
 
 
@@ -41,20 +43,20 @@ add = uncurry @t @t . num
     num (FloatingNumType t) = floating t
 
     integral :: IntegralType t -> TensorArrayData t -> TensorArrayData t -> TensorArrayData t
-    integral TypeInt    = TF.add
-    integral TypeInt8   = TF.add
-    integral TypeInt16  = TF.add
-    integral TypeInt32  = TF.add
-    integral TypeInt64  = TF.add
-    integral TypeWord   = TF.add
-    integral TypeWord8  = TF.add
-    integral TypeWord16 = TF.add
-    integral TypeWord32 = TF.add
-    integral TypeWord64 = TF.add
+    integral TypeInt    = Sh.wrap "add" TF.add
+    integral TypeInt8   = Sh.wrap "add" TF.add
+    integral TypeInt16  = Sh.wrap "add" TF.add
+    integral TypeInt32  = Sh.wrap "add" TF.add
+    integral TypeInt64  = Sh.wrap "add" TF.add
+    integral TypeWord   = Sh.wrap "add" TF.add
+    integral TypeWord8  = Sh.wrap "add" TF.add
+    integral TypeWord16 = Sh.wrap "add" TF.add
+    integral TypeWord32 = Sh.wrap "add" TF.add
+    integral TypeWord64 = Sh.wrap "add" TF.add
 
     floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t -> TensorArrayData t
-    floating TypeFloat  = TF.add
-    floating TypeDouble = TF.add
+    floating TypeFloat  = Sh.wrap "add" TF.add
+    floating TypeDouble = Sh.wrap "add" TF.add
     floating TypeHalf   = unsupported "half-precision floating point"
 
 sub :: forall t. NumType t -> TensorArrayData (t, t) -> TensorArrayData t
@@ -65,20 +67,20 @@ sub = uncurry @t @t . num
     num (FloatingNumType t) = floating t
 
     integral :: IntegralType t -> TensorArrayData t -> TensorArrayData t -> TensorArrayData t
-    integral TypeInt    = TF.sub
-    integral TypeInt8   = TF.sub
-    integral TypeInt16  = TF.sub
-    integral TypeInt32  = TF.sub
-    integral TypeInt64  = TF.sub
-    integral TypeWord   = TF.sub
-    integral TypeWord8  = TF.sub
-    integral TypeWord16 = TF.sub
-    integral TypeWord32 = TF.sub
-    integral TypeWord64 = TF.sub
+    integral TypeInt    = Sh.wrap "sub" TF.sub
+    integral TypeInt8   = Sh.wrap "sub" TF.sub
+    integral TypeInt16  = Sh.wrap "sub" TF.sub
+    integral TypeInt32  = Sh.wrap "sub" TF.sub
+    integral TypeInt64  = Sh.wrap "sub" TF.sub
+    integral TypeWord   = Sh.wrap "sub" TF.sub
+    integral TypeWord8  = Sh.wrap "sub" TF.sub
+    integral TypeWord16 = Sh.wrap "sub" TF.sub
+    integral TypeWord32 = Sh.wrap "sub" TF.sub
+    integral TypeWord64 = Sh.wrap "sub" TF.sub
 
     floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t -> TensorArrayData t
-    floating TypeFloat  = TF.sub
-    floating TypeDouble = TF.sub
+    floating TypeFloat  = Sh.wrap "sub" TF.sub
+    floating TypeDouble = Sh.wrap "sub" TF.sub
     floating TypeHalf   = unsupported "half-precision floating point"
 
 mul :: forall t. NumType t -> TensorArrayData (t, t) -> TensorArrayData t
@@ -89,20 +91,20 @@ mul = uncurry @t @t . num
     num (FloatingNumType t) = floating t
 
     integral :: IntegralType t -> TensorArrayData t -> TensorArrayData t -> TensorArrayData t
-    integral TypeInt    = TF.mul
-    integral TypeInt8   = TF.mul
-    integral TypeInt16  = TF.mul
-    integral TypeInt32  = TF.mul
-    integral TypeInt64  = TF.mul
-    integral TypeWord   = TF.mul
-    integral TypeWord8  = TF.mul
-    integral TypeWord16 = TF.mul
-    integral TypeWord32 = TF.mul
-    integral TypeWord64 = TF.mul
+    integral TypeInt    = Sh.wrap "mul" TF.mul
+    integral TypeInt8   = Sh.wrap "mul" TF.mul
+    integral TypeInt16  = Sh.wrap "mul" TF.mul
+    integral TypeInt32  = Sh.wrap "mul" TF.mul
+    integral TypeInt64  = Sh.wrap "mul" TF.mul
+    integral TypeWord   = Sh.wrap "mul" TF.mul
+    integral TypeWord8  = Sh.wrap "mul" TF.mul
+    integral TypeWord16 = Sh.wrap "mul" TF.mul
+    integral TypeWord32 = Sh.wrap "mul" TF.mul
+    integral TypeWord64 = Sh.wrap "mul" TF.mul
 
     floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t -> TensorArrayData t
-    floating TypeFloat  = TF.mul
-    floating TypeDouble = TF.mul
+    floating TypeFloat  = Sh.wrap "mul" TF.mul
+    floating TypeDouble = Sh.wrap "mul" TF.mul
     floating TypeHalf   = unsupported "half-precision floating point"
 
 neg :: NumType t -> TensorArrayData t -> TensorArrayData t
@@ -113,20 +115,20 @@ neg = num
     num (FloatingNumType t) = floating t
 
     integral :: IntegralType t -> TensorArrayData t -> TensorArrayData t
-    integral TypeInt    = TF.neg
-    integral TypeInt8   = TF.neg
-    integral TypeInt16  = TF.neg
-    integral TypeInt32  = TF.neg
-    integral TypeInt64  = TF.neg
-    integral TypeWord   = TF.neg
+    integral TypeInt    = Sh.wrap "neg" TF.neg
+    integral TypeInt8   = Sh.wrap "neg" TF.neg
+    integral TypeInt16  = Sh.wrap "neg" TF.neg
+    integral TypeInt32  = Sh.wrap "neg" TF.neg
+    integral TypeInt64  = Sh.wrap "neg" TF.neg
+    integral TypeWord   = Sh.wrap "neg" TF.neg
     integral TypeWord8  = id
-    integral TypeWord16 = TF.neg
-    integral TypeWord32 = TF.neg
-    integral TypeWord64 = TF.neg
+    integral TypeWord16 = Sh.wrap "neg" TF.neg
+    integral TypeWord32 = Sh.wrap "neg" TF.neg
+    integral TypeWord64 = Sh.wrap "neg" TF.neg
 
     floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t
-    floating TypeFloat  = TF.neg
-    floating TypeDouble = TF.neg
+    floating TypeFloat  = Sh.wrap "neg" TF.neg
+    floating TypeDouble = Sh.wrap "neg" TF.neg
     floating TypeHalf   = unsupported "half-precision floating point"
 
 abs :: NumType t -> TensorArrayData t -> TensorArrayData t
@@ -137,20 +139,20 @@ abs = num
     num (FloatingNumType t) = floating t
 
     integral :: IntegralType t -> TensorArrayData t -> TensorArrayData t
-    integral TypeInt    = TF.abs
-    integral TypeInt8   = TF.abs
-    integral TypeInt16  = TF.abs
-    integral TypeInt32  = TF.abs
-    integral TypeInt64  = TF.abs
-    integral TypeWord   = TF.abs
+    integral TypeInt    = Sh.wrap "abs" TF.abs
+    integral TypeInt8   = Sh.wrap "abs" TF.abs
+    integral TypeInt16  = Sh.wrap "abs" TF.abs
+    integral TypeInt32  = Sh.wrap "abs" TF.abs
+    integral TypeInt64  = Sh.wrap "abs" TF.abs
+    integral TypeWord   = Sh.wrap "abs" TF.abs
     integral TypeWord8  = id
-    integral TypeWord16 = TF.abs
-    integral TypeWord32 = TF.abs
-    integral TypeWord64 = TF.abs
+    integral TypeWord16 = Sh.wrap "abs" TF.abs
+    integral TypeWord32 = Sh.wrap "abs" TF.abs
+    integral TypeWord64 = Sh.wrap "abs" TF.abs
 
     floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t
-    floating TypeFloat  = TF.abs
-    floating TypeDouble = TF.abs
+    floating TypeFloat  = Sh.wrap "abs" TF.abs
+    floating TypeDouble = Sh.wrap "abs" TF.abs
     floating TypeHalf   = unsupported "half-precision floating point"
 
 signum :: NumType t -> TensorArrayData t -> TensorArrayData t
@@ -161,51 +163,51 @@ signum = num
     num (FloatingNumType t) = floating t
 
     integral :: IntegralType t -> TensorArrayData t -> TensorArrayData t
-    integral TypeInt    = TF.sign
+    integral TypeInt    = Sh.wrap "sign" TF.sign
     integral TypeInt8   = excluded
     integral TypeInt16  = excluded
-    integral TypeInt32  = TF.sign
-    integral TypeInt64  = TF.sign
-    integral TypeWord   = TF.sign
+    integral TypeInt32  = Sh.wrap "sign" TF.sign
+    integral TypeInt64  = Sh.wrap "sign" TF.sign
+    integral TypeWord   = Sh.wrap "sign" TF.sign
     integral TypeWord8  = id
-    integral TypeWord16 = TF.sign
-    integral TypeWord32 = TF.sign
-    integral TypeWord64 = TF.sign
+    integral TypeWord16 = Sh.wrap "sign" TF.sign
+    integral TypeWord32 = Sh.wrap "sign" TF.sign
+    integral TypeWord64 = Sh.wrap "sign" TF.sign
 
     floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t
-    floating TypeFloat  = TF.sign
-    floating TypeDouble = TF.sign
+    floating TypeFloat  = Sh.wrap "sign" TF.sign
+    floating TypeDouble = Sh.wrap "sign" TF.sign
     floating TypeHalf   = unsupported "half-precision floating point"
 
 quot :: forall t. IntegralType t -> TensorArrayData (t, t) -> TensorArrayData t
 quot = uncurry @t @t . integral
   where
     integral :: IntegralType t -> TensorArrayData t -> TensorArrayData t -> TensorArrayData t
-    integral TypeInt    = TF.div
-    integral TypeInt8   = TF.div
-    integral TypeInt16  = TF.div
-    integral TypeInt32  = TF.div
-    integral TypeInt64  = TF.div
-    integral TypeWord   = TF.div
-    integral TypeWord8  = TF.div
-    integral TypeWord16 = TF.div
-    integral TypeWord32 = TF.div
-    integral TypeWord64 = TF.div
+    integral TypeInt    = Sh.wrap "div" TF.div
+    integral TypeInt8   = Sh.wrap "div" TF.div
+    integral TypeInt16  = Sh.wrap "div" TF.div
+    integral TypeInt32  = Sh.wrap "div" TF.div
+    integral TypeInt64  = Sh.wrap "div" TF.div
+    integral TypeWord   = Sh.wrap "div" TF.div
+    integral TypeWord8  = Sh.wrap "div" TF.div
+    integral TypeWord16 = Sh.wrap "div" TF.div
+    integral TypeWord32 = Sh.wrap "div" TF.div
+    integral TypeWord64 = Sh.wrap "div" TF.div
 
 rem :: forall t. IntegralType t -> TensorArrayData (t, t) -> TensorArrayData t
 rem = uncurry @t @t . integral
   where
     integral :: IntegralType t -> TensorArrayData t -> TensorArrayData t -> TensorArrayData t
-    integral TypeInt    = TF.mod
+    integral TypeInt    = Sh.wrap "mod" TF.mod
     integral TypeInt8   = excluded
     integral TypeInt16  = excluded
-    integral TypeInt32  = TF.mod
-    integral TypeInt64  = TF.mod
-    integral TypeWord   = TF.mod
+    integral TypeInt32  = Sh.wrap "mod" TF.mod
+    integral TypeInt64  = Sh.wrap "mod" TF.mod
+    integral TypeWord   = Sh.wrap "mod" TF.mod
     integral TypeWord8  = excluded
-    integral TypeWord16 = TF.mod
-    integral TypeWord32 = TF.mod
-    integral TypeWord64 = TF.mod
+    integral TypeWord16 = Sh.wrap "mod" TF.mod
+    integral TypeWord32 = Sh.wrap "mod" TF.mod
+    integral TypeWord64 = Sh.wrap "mod" TF.mod
 
 quotRem :: forall t. IntegralType t -> TensorArrayData (t, t) -> TensorArrayData (t, t)
 quotRem t xy =
@@ -222,91 +224,91 @@ band :: forall t. IntegralType t -> TensorArrayData (t, t) -> TensorArrayData t
 band = uncurry @t @t . integral
   where
     integral :: IntegralType t -> TensorArrayData t -> TensorArrayData t -> TensorArrayData t
-    integral TypeInt    = TF.bitwiseAnd
-    integral TypeInt8   = TF.bitwiseAnd
-    integral TypeInt16  = TF.bitwiseAnd
-    integral TypeInt32  = TF.bitwiseAnd
-    integral TypeInt64  = TF.bitwiseAnd
-    integral TypeWord   = TF.bitwiseAnd
-    integral TypeWord8  = TF.bitwiseAnd
-    integral TypeWord16 = TF.bitwiseAnd
-    integral TypeWord32 = TF.bitwiseAnd
-    integral TypeWord64 = TF.bitwiseAnd
+    integral TypeInt    = Sh.wrap "bitwiseAnd" TF.bitwiseAnd
+    integral TypeInt8   = Sh.wrap "bitwiseAnd" TF.bitwiseAnd
+    integral TypeInt16  = Sh.wrap "bitwiseAnd" TF.bitwiseAnd
+    integral TypeInt32  = Sh.wrap "bitwiseAnd" TF.bitwiseAnd
+    integral TypeInt64  = Sh.wrap "bitwiseAnd" TF.bitwiseAnd
+    integral TypeWord   = Sh.wrap "bitwiseAnd" TF.bitwiseAnd
+    integral TypeWord8  = Sh.wrap "bitwiseAnd" TF.bitwiseAnd
+    integral TypeWord16 = Sh.wrap "bitwiseAnd" TF.bitwiseAnd
+    integral TypeWord32 = Sh.wrap "bitwiseAnd" TF.bitwiseAnd
+    integral TypeWord64 = Sh.wrap "bitwiseAnd" TF.bitwiseAnd
 
 bor :: forall t. IntegralType t -> TensorArrayData (t, t) -> TensorArrayData t
 bor = uncurry @t @t . integral
   where
     integral :: IntegralType t -> TensorArrayData t -> TensorArrayData t -> TensorArrayData t
-    integral TypeInt    = TF.bitwiseOr
-    integral TypeInt8   = TF.bitwiseOr
-    integral TypeInt16  = TF.bitwiseOr
-    integral TypeInt32  = TF.bitwiseOr
-    integral TypeInt64  = TF.bitwiseOr
-    integral TypeWord   = TF.bitwiseOr
-    integral TypeWord8  = TF.bitwiseOr
-    integral TypeWord16 = TF.bitwiseOr
-    integral TypeWord32 = TF.bitwiseOr
-    integral TypeWord64 = TF.bitwiseOr
+    integral TypeInt    = Sh.wrap "bitwiseOr" TF.bitwiseOr
+    integral TypeInt8   = Sh.wrap "bitwiseOr" TF.bitwiseOr
+    integral TypeInt16  = Sh.wrap "bitwiseOr" TF.bitwiseOr
+    integral TypeInt32  = Sh.wrap "bitwiseOr" TF.bitwiseOr
+    integral TypeInt64  = Sh.wrap "bitwiseOr" TF.bitwiseOr
+    integral TypeWord   = Sh.wrap "bitwiseOr" TF.bitwiseOr
+    integral TypeWord8  = Sh.wrap "bitwiseOr" TF.bitwiseOr
+    integral TypeWord16 = Sh.wrap "bitwiseOr" TF.bitwiseOr
+    integral TypeWord32 = Sh.wrap "bitwiseOr" TF.bitwiseOr
+    integral TypeWord64 = Sh.wrap "bitwiseOr" TF.bitwiseOr
 
 xor :: forall t. IntegralType t -> TensorArrayData (t, t) -> TensorArrayData t
 xor = uncurry @t @t . integral
   where
     integral :: IntegralType t -> TensorArrayData t -> TensorArrayData t -> TensorArrayData t
-    integral TypeInt    = TF.bitwiseXor
-    integral TypeInt8   = TF.bitwiseXor
-    integral TypeInt16  = TF.bitwiseXor
-    integral TypeInt32  = TF.bitwiseXor
-    integral TypeInt64  = TF.bitwiseXor
-    integral TypeWord   = TF.bitwiseXor
-    integral TypeWord8  = TF.bitwiseXor
-    integral TypeWord16 = TF.bitwiseXor
-    integral TypeWord32 = TF.bitwiseXor
-    integral TypeWord64 = TF.bitwiseXor
+    integral TypeInt    = Sh.wrap "bitwiseXor" TF.bitwiseXor
+    integral TypeInt8   = Sh.wrap "bitwiseXor" TF.bitwiseXor
+    integral TypeInt16  = Sh.wrap "bitwiseXor" TF.bitwiseXor
+    integral TypeInt32  = Sh.wrap "bitwiseXor" TF.bitwiseXor
+    integral TypeInt64  = Sh.wrap "bitwiseXor" TF.bitwiseXor
+    integral TypeWord   = Sh.wrap "bitwiseXor" TF.bitwiseXor
+    integral TypeWord8  = Sh.wrap "bitwiseXor" TF.bitwiseXor
+    integral TypeWord16 = Sh.wrap "bitwiseXor" TF.bitwiseXor
+    integral TypeWord32 = Sh.wrap "bitwiseXor" TF.bitwiseXor
+    integral TypeWord64 = Sh.wrap "bitwiseXor" TF.bitwiseXor
 
 complement :: IntegralType t -> TensorArrayData t -> TensorArrayData t
 complement = integral
   where
     integral :: IntegralType t -> TensorArrayData t -> TensorArrayData t
-    integral TypeInt    t = TF.bitwiseXor t (TF.scalar (-1))
-    integral TypeInt8   t = TF.bitwiseXor t (TF.scalar (-1))
-    integral TypeInt16  t = TF.bitwiseXor t (TF.scalar (-1))
-    integral TypeInt32  t = TF.bitwiseXor t (TF.scalar (-1))
-    integral TypeInt64  t = TF.bitwiseXor t (TF.scalar (-1))
-    integral TypeWord   t = TF.bitwiseXor t (TF.scalar maxBound)
-    integral TypeWord8  t = TF.bitwiseXor t (TF.scalar maxBound)
-    integral TypeWord16 t = TF.bitwiseXor t (TF.scalar maxBound)
-    integral TypeWord32 t = TF.bitwiseXor t (TF.scalar maxBound)
-    integral TypeWord64 t = TF.bitwiseXor t (TF.scalar maxBound)
+    integral TypeInt    t = Sh.wrap "bitwiseXor" TF.bitwiseXor t (Sh.wrap1 "scalar" TF.scalar (-1))
+    integral TypeInt8   t = Sh.wrap "bitwiseXor" TF.bitwiseXor t (Sh.wrap1 "scalar" TF.scalar (-1))
+    integral TypeInt16  t = Sh.wrap "bitwiseXor" TF.bitwiseXor t (Sh.wrap1 "scalar" TF.scalar (-1))
+    integral TypeInt32  t = Sh.wrap "bitwiseXor" TF.bitwiseXor t (Sh.wrap1 "scalar" TF.scalar (-1))
+    integral TypeInt64  t = Sh.wrap "bitwiseXor" TF.bitwiseXor t (Sh.wrap1 "scalar" TF.scalar (-1))
+    integral TypeWord   t = Sh.wrap "bitwiseXor" TF.bitwiseXor t (Sh.wrap1 "scalar" TF.scalar maxBound)
+    integral TypeWord8  t = Sh.wrap "bitwiseXor" TF.bitwiseXor t (Sh.wrap1 "scalar" TF.scalar maxBound)
+    integral TypeWord16 t = Sh.wrap "bitwiseXor" TF.bitwiseXor t (Sh.wrap1 "scalar" TF.scalar maxBound)
+    integral TypeWord32 t = Sh.wrap "bitwiseXor" TF.bitwiseXor t (Sh.wrap1 "scalar" TF.scalar maxBound)
+    integral TypeWord64 t = Sh.wrap "bitwiseXor" TF.bitwiseXor t (Sh.wrap1 "scalar" TF.scalar maxBound)
 
 shiftL :: forall t. IntegralType t -> TensorArrayData (t, Int) -> TensorArrayData t
 shiftL = uncurry @t @Int . integral
   where
     integral :: IntegralType t -> TensorArrayData t -> TensorArrayData Int -> TensorArrayData t
-    integral TypeInt    t x = TF.leftShift t x
-    integral TypeInt8   t x = TF.leftShift t (TF.cast x)
-    integral TypeInt16  t x = TF.leftShift t (TF.cast x)
-    integral TypeInt32  t x = TF.leftShift t (TF.cast x)
-    integral TypeInt64  t x = TF.leftShift t (TF.cast x)
-    integral TypeWord   t x = TF.leftShift t (TF.cast x)
-    integral TypeWord8  t x = TF.leftShift t (TF.cast x)
-    integral TypeWord16 t x = TF.leftShift t (TF.cast x)
-    integral TypeWord32 t x = TF.leftShift t (TF.cast x)
-    integral TypeWord64 t x = TF.leftShift t (TF.cast x)
+    integral TypeInt    t x = Sh.wrap "leftShift" TF.leftShift t x
+    integral TypeInt8   t x = Sh.wrap "leftShift" TF.leftShift t (Sh.wrap "cast" TF.cast x)
+    integral TypeInt16  t x = Sh.wrap "leftShift" TF.leftShift t (Sh.wrap "cast" TF.cast x)
+    integral TypeInt32  t x = Sh.wrap "leftShift" TF.leftShift t (Sh.wrap "cast" TF.cast x)
+    integral TypeInt64  t x = Sh.wrap "leftShift" TF.leftShift t (Sh.wrap "cast" TF.cast x)
+    integral TypeWord   t x = Sh.wrap "leftShift" TF.leftShift t (Sh.wrap "cast" TF.cast x)
+    integral TypeWord8  t x = Sh.wrap "leftShift" TF.leftShift t (Sh.wrap "cast" TF.cast x)
+    integral TypeWord16 t x = Sh.wrap "leftShift" TF.leftShift t (Sh.wrap "cast" TF.cast x)
+    integral TypeWord32 t x = Sh.wrap "leftShift" TF.leftShift t (Sh.wrap "cast" TF.cast x)
+    integral TypeWord64 t x = Sh.wrap "leftShift" TF.leftShift t (Sh.wrap "cast" TF.cast x)
 
 shiftR  :: forall t. IntegralType t -> TensorArrayData (t, Int) -> TensorArrayData t
 shiftR = uncurry @t @Int . integral
   where
     integral :: IntegralType t -> TensorArrayData t -> TensorArrayData Int -> TensorArrayData t
-    integral TypeInt    t x = TF.rightShift t x
-    integral TypeInt8   t x = TF.rightShift t (TF.cast x)
-    integral TypeInt16  t x = TF.rightShift t (TF.cast x)
-    integral TypeInt32  t x = TF.rightShift t (TF.cast x)
-    integral TypeInt64  t x = TF.rightShift t (TF.cast x)
-    integral TypeWord   t x = TF.rightShift t (TF.cast x)
-    integral TypeWord8  t x = TF.rightShift t (TF.cast x)
-    integral TypeWord16 t x = TF.rightShift t (TF.cast x)
-    integral TypeWord32 t x = TF.rightShift t (TF.cast x)
-    integral TypeWord64 t x = TF.rightShift t (TF.cast x)
+    integral TypeInt    t x = Sh.wrap "rightShift" TF.rightShift t x
+    integral TypeInt8   t x = Sh.wrap "rightShift" TF.rightShift t (Sh.wrap "cast" TF.cast x)
+    integral TypeInt16  t x = Sh.wrap "rightShift" TF.rightShift t (Sh.wrap "cast" TF.cast x)
+    integral TypeInt32  t x = Sh.wrap "rightShift" TF.rightShift t (Sh.wrap "cast" TF.cast x)
+    integral TypeInt64  t x = Sh.wrap "rightShift" TF.rightShift t (Sh.wrap "cast" TF.cast x)
+    integral TypeWord   t x = Sh.wrap "rightShift" TF.rightShift t (Sh.wrap "cast" TF.cast x)
+    integral TypeWord8  t x = Sh.wrap "rightShift" TF.rightShift t (Sh.wrap "cast" TF.cast x)
+    integral TypeWord16 t x = Sh.wrap "rightShift" TF.rightShift t (Sh.wrap "cast" TF.cast x)
+    integral TypeWord32 t x = Sh.wrap "rightShift" TF.rightShift t (Sh.wrap "cast" TF.cast x)
+    integral TypeWord64 t x = Sh.wrap "rightShift" TF.rightShift t (Sh.wrap "cast" TF.cast x)
 
 -- rotateL :: IntegralType t -> TensorArrayData t -> TensorArrayData Int -> TensorArrayData t
 -- rotateR :: IntegralType t -> TensorArrayData t -> TensorArrayData Int -> TensorArrayData t
@@ -315,16 +317,16 @@ popCount :: IntegralType t -> TensorArrayData t -> TensorArrayData Int
 popCount = integral
   where
     integral :: IntegralType t -> TensorArrayData t -> TensorArrayData Int
-    integral TypeInt    = TF.cast . TF.populationCount
-    integral TypeInt8   = TF.cast . TF.populationCount
-    integral TypeInt16  = TF.cast . TF.populationCount
-    integral TypeInt32  = TF.cast . TF.populationCount
-    integral TypeInt64  = TF.cast . TF.populationCount
-    integral TypeWord   = TF.cast . TF.populationCount
-    integral TypeWord8  = TF.cast . TF.populationCount
-    integral TypeWord16 = TF.cast . TF.populationCount
-    integral TypeWord32 = TF.cast . TF.populationCount
-    integral TypeWord64 = TF.cast . TF.populationCount
+    integral TypeInt    = Sh.wrap "cast" TF.cast . Sh.wrap "populationCount" TF.populationCount
+    integral TypeInt8   = Sh.wrap "cast" TF.cast . Sh.wrap "populationCount" TF.populationCount
+    integral TypeInt16  = Sh.wrap "cast" TF.cast . Sh.wrap "populationCount" TF.populationCount
+    integral TypeInt32  = Sh.wrap "cast" TF.cast . Sh.wrap "populationCount" TF.populationCount
+    integral TypeInt64  = Sh.wrap "cast" TF.cast . Sh.wrap "populationCount" TF.populationCount
+    integral TypeWord   = Sh.wrap "cast" TF.cast . Sh.wrap "populationCount" TF.populationCount
+    integral TypeWord8  = Sh.wrap "cast" TF.cast . Sh.wrap "populationCount" TF.populationCount
+    integral TypeWord16 = Sh.wrap "cast" TF.cast . Sh.wrap "populationCount" TF.populationCount
+    integral TypeWord32 = Sh.wrap "cast" TF.cast . Sh.wrap "populationCount" TF.populationCount
+    integral TypeWord64 = Sh.wrap "cast" TF.cast . Sh.wrap "populationCount" TF.populationCount
 
 -- countLeadingZeros  :: IntegralType t -> TensorArrayData t -> TensorArrayData Int
 -- countTrailingZeros :: IntegralType t -> TensorArrayData t -> TensorArrayData Int
@@ -333,144 +335,144 @@ fdiv :: forall t. FloatingType t -> TensorArrayData (t, t) -> TensorArrayData t
 fdiv = uncurry @t @t . floating
   where
     floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t -> TensorArrayData t
-    floating TypeFloat  = TF.div
-    floating TypeDouble = TF.div
+    floating TypeFloat  = Sh.wrap "div" TF.div
+    floating TypeDouble = Sh.wrap "div" TF.div
     floating TypeHalf   = unsupported "half-precision floating point"
 
 recip :: FloatingType t -> TensorArrayData t -> TensorArrayData t
 recip = floating
   where
     floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t
-    floating TypeFloat  = TF.reciprocal
-    floating TypeDouble = TF.reciprocal
+    floating TypeFloat  = Sh.wrap "reciprocal" TF.reciprocal
+    floating TypeDouble = Sh.wrap "reciprocal" TF.reciprocal
     floating TypeHalf   = unsupported "half-precision floating point"
 
 sin :: FloatingType t -> TensorArrayData t -> TensorArrayData t
 sin = floating
   where
     floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t
-    floating TypeFloat  = TF.sin
-    floating TypeDouble = TF.sin
+    floating TypeFloat  = Sh.wrap "sin" TF.sin
+    floating TypeDouble = Sh.wrap "sin" TF.sin
     floating TypeHalf   = unsupported "half-precision floating point"
 
 cos :: FloatingType t -> TensorArrayData t -> TensorArrayData t
 cos = floating
   where
     floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t
-    floating TypeFloat  = TF.cos
-    floating TypeDouble = TF.cos
+    floating TypeFloat  = Sh.wrap "cos" TF.cos
+    floating TypeDouble = Sh.wrap "cos" TF.cos
     floating TypeHalf   = unsupported "half-precision floating point"
 
 tan :: FloatingType t -> TensorArrayData t -> TensorArrayData t
 tan = floating
   where
     floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t
-    floating TypeFloat  = TF.tan
-    floating TypeDouble = TF.tan
+    floating TypeFloat  = Sh.wrap "tan" TF.tan
+    floating TypeDouble = Sh.wrap "tan" TF.tan
     floating TypeHalf   = unsupported "half-precision floating point"
 
 asin :: FloatingType t -> TensorArrayData t -> TensorArrayData t
 asin = floating
   where
     floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t
-    floating TypeFloat  = TF.asin
-    floating TypeDouble = TF.asin
+    floating TypeFloat  = Sh.wrap "asin" TF.asin
+    floating TypeDouble = Sh.wrap "asin" TF.asin
     floating TypeHalf   = unsupported "half-precision floating point"
 
 acos :: FloatingType t -> TensorArrayData t -> TensorArrayData t
 acos = floating
   where
     floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t
-    floating TypeFloat  = TF.acos
-    floating TypeDouble = TF.acos
+    floating TypeFloat  = Sh.wrap "acos" TF.acos
+    floating TypeDouble = Sh.wrap "acos" TF.acos
     floating TypeHalf   = unsupported "half-precision floating point"
 
 atan :: FloatingType t -> TensorArrayData t -> TensorArrayData t
 atan = floating
   where
     floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t
-    floating TypeFloat  = TF.atan
-    floating TypeDouble = TF.atan
+    floating TypeFloat  = Sh.wrap "atan" TF.atan
+    floating TypeDouble = Sh.wrap "atan" TF.atan
     floating TypeHalf   = unsupported "half-precision floating point"
 
 sinh :: FloatingType t -> TensorArrayData t -> TensorArrayData t
 sinh = floating
   where
     floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t
-    floating TypeFloat  = TF.sinh
-    floating TypeDouble = TF.sinh
+    floating TypeFloat  = Sh.wrap "sinh" TF.sinh
+    floating TypeDouble = Sh.wrap "sinh" TF.sinh
     floating TypeHalf   = unsupported "half-precision floating point"
 
 cosh :: FloatingType t -> TensorArrayData t -> TensorArrayData t
 cosh = floating
   where
     floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t
-    floating TypeFloat  = TF.cosh
-    floating TypeDouble = TF.cosh
+    floating TypeFloat  = Sh.wrap "cosh" TF.cosh
+    floating TypeDouble = Sh.wrap "cosh" TF.cosh
     floating TypeHalf   = unsupported "half-precision floating point"
 
 tanh :: FloatingType t -> TensorArrayData t -> TensorArrayData t
 tanh = floating
   where
     floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t
-    floating TypeFloat  = TF.tanh
-    floating TypeDouble = TF.tanh
+    floating TypeFloat  = Sh.wrap "tanh" TF.tanh
+    floating TypeDouble = Sh.wrap "tanh" TF.tanh
     floating TypeHalf   = unsupported "half-precision floating point"
 
 asinh :: FloatingType t -> TensorArrayData t -> TensorArrayData t
 asinh = floating
   where
     floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t
-    floating TypeFloat  = TF.asinh
-    floating TypeDouble = TF.asinh
+    floating TypeFloat  = Sh.wrap "asinh" TF.asinh
+    floating TypeDouble = Sh.wrap "asinh" TF.asinh
     floating TypeHalf   = unsupported "half-precision floating point"
 
 acosh :: FloatingType t -> TensorArrayData t -> TensorArrayData t
 acosh = floating
   where
     floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t
-    floating TypeFloat  = TF.acosh
-    floating TypeDouble = TF.acosh
+    floating TypeFloat  = Sh.wrap "acosh" TF.acosh
+    floating TypeDouble = Sh.wrap "acosh" TF.acosh
     floating TypeHalf   = unsupported "half-precision floating point"
 
 atanh :: FloatingType t -> TensorArrayData t -> TensorArrayData t
 atanh = floating
   where
     floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t
-    floating TypeFloat  = TF.atanh
-    floating TypeDouble = TF.atanh
+    floating TypeFloat  = Sh.wrap "atanh" TF.atanh
+    floating TypeDouble = Sh.wrap "atanh" TF.atanh
     floating TypeHalf   = unsupported "half-precision floating point"
 
 exp :: FloatingType t -> TensorArrayData t -> TensorArrayData t
 exp = floating
   where
     floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t
-    floating TypeFloat  = TF.exp
-    floating TypeDouble = TF.exp
+    floating TypeFloat  = Sh.wrap "exp" TF.exp
+    floating TypeDouble = Sh.wrap "exp" TF.exp
     floating TypeHalf   = unsupported "half-precision floating point"
 
 sqrt :: FloatingType t -> TensorArrayData t -> TensorArrayData t
 sqrt = floating
   where
     floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t
-    floating TypeFloat  = TF.sqrt
-    floating TypeDouble = TF.sqrt
+    floating TypeFloat  = Sh.wrap "sqrt" TF.sqrt
+    floating TypeDouble = Sh.wrap "sqrt" TF.sqrt
     floating TypeHalf   = unsupported "half-precision floating point"
 
 log :: FloatingType t -> TensorArrayData t -> TensorArrayData t
 log = floating
   where
     floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t
-    floating TypeFloat  = TF.log
-    floating TypeDouble = TF.log
+    floating TypeFloat  = Sh.wrap "log" TF.log
+    floating TypeDouble = Sh.wrap "log" TF.log
     floating TypeHalf   = unsupported "half-precision floating point"
 
 fpow :: forall t. FloatingType t -> TensorArrayData (t, t) -> TensorArrayData t
 fpow = uncurry @t @t . floating
   where
     floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t -> TensorArrayData t
-    floating TypeFloat  = TF.pow
-    floating TypeDouble = TF.pow
+    floating TypeFloat  = Sh.wrap "pow" TF.pow
+    floating TypeDouble = Sh.wrap "pow" TF.pow
     floating TypeHalf   = unsupported "half-precision floating point"
 
 logBase :: forall t. FloatingType t -> TensorArrayData (t, t) -> TensorArrayData t
@@ -491,100 +493,100 @@ truncate = floating
     floating TypeDouble = integral
     floating TypeHalf   = unsupported "half-precision floating point"
 
-    integral :: (ScalarTensorArrayData a, TF.TensorType a) => IntegralType b -> TensorArrayData a -> TensorArrayData b
-    integral TypeInt    = TF.cast
-    integral TypeInt8   = TF.cast
-    integral TypeInt16  = TF.cast
-    integral TypeInt32  = TF.cast
-    integral TypeInt64  = TF.cast
-    integral TypeWord   = TF.cast
-    integral TypeWord8  = TF.cast
-    integral TypeWord16 = TF.cast
-    integral TypeWord32 = TF.cast
-    integral TypeWord64 = TF.cast
+    integral :: (ScalarTensorArrayData a, TF.TensorType a, Typeable a, Show a) => IntegralType b -> TensorArrayData a -> TensorArrayData b
+    integral TypeInt    = Sh.wrap "cast" TF.cast
+    integral TypeInt8   = Sh.wrap "cast" TF.cast
+    integral TypeInt16  = Sh.wrap "cast" TF.cast
+    integral TypeInt32  = Sh.wrap "cast" TF.cast
+    integral TypeInt64  = Sh.wrap "cast" TF.cast
+    integral TypeWord   = Sh.wrap "cast" TF.cast
+    integral TypeWord8  = Sh.wrap "cast" TF.cast
+    integral TypeWord16 = Sh.wrap "cast" TF.cast
+    integral TypeWord32 = Sh.wrap "cast" TF.cast
+    integral TypeWord64 = Sh.wrap "cast" TF.cast
 
 round :: FloatingType a -> IntegralType b -> TensorArrayData a -> TensorArrayData b
 round = floating
   where
     floating :: FloatingType a -> IntegralType b -> TensorArrayData a -> TensorArrayData b
-    floating TypeFloat  t = integral t . TF.round
-    floating TypeDouble t = integral t . TF.round
+    floating TypeFloat  t = integral t . Sh.wrap "round" TF.round
+    floating TypeDouble t = integral t . Sh.wrap "round" TF.round
     floating TypeHalf   _ = unsupported "half-precision floating point"
 
-    integral :: (ScalarTensorArrayData a, TF.TensorType a) => IntegralType b -> TensorArrayData a -> TensorArrayData b
-    integral TypeInt    = TF.cast
-    integral TypeInt8   = TF.cast
-    integral TypeInt16  = TF.cast
-    integral TypeInt32  = TF.cast
-    integral TypeInt64  = TF.cast
-    integral TypeWord   = TF.cast
-    integral TypeWord8  = TF.cast
-    integral TypeWord16 = TF.cast
-    integral TypeWord32 = TF.cast
-    integral TypeWord64 = TF.cast
+    integral :: (ScalarTensorArrayData a, TF.TensorType a, Typeable a, Show a) => IntegralType b -> TensorArrayData a -> TensorArrayData b
+    integral TypeInt    = Sh.wrap "cast" TF.cast
+    integral TypeInt8   = Sh.wrap "cast" TF.cast
+    integral TypeInt16  = Sh.wrap "cast" TF.cast
+    integral TypeInt32  = Sh.wrap "cast" TF.cast
+    integral TypeInt64  = Sh.wrap "cast" TF.cast
+    integral TypeWord   = Sh.wrap "cast" TF.cast
+    integral TypeWord8  = Sh.wrap "cast" TF.cast
+    integral TypeWord16 = Sh.wrap "cast" TF.cast
+    integral TypeWord32 = Sh.wrap "cast" TF.cast
+    integral TypeWord64 = Sh.wrap "cast" TF.cast
 
 floor :: FloatingType a -> IntegralType b -> TensorArrayData a -> TensorArrayData b
 floor = floating
   where
     floating :: FloatingType a -> IntegralType b -> TensorArrayData a -> TensorArrayData b
-    floating TypeFloat  t = integral t . TF.floor
-    floating TypeDouble t = integral t . TF.floor
+    floating TypeFloat  t = integral t . Sh.wrap "floor" TF.floor
+    floating TypeDouble t = integral t . Sh.wrap "floor" TF.floor
     floating TypeHalf   _ = unsupported "half-precision floating point"
 
-    integral :: (ScalarTensorArrayData a, TF.TensorType a) => IntegralType b -> TensorArrayData a -> TensorArrayData b
-    integral TypeInt    = TF.cast
-    integral TypeInt8   = TF.cast
-    integral TypeInt16  = TF.cast
-    integral TypeInt32  = TF.cast
-    integral TypeInt64  = TF.cast
-    integral TypeWord   = TF.cast
-    integral TypeWord8  = TF.cast
-    integral TypeWord16 = TF.cast
-    integral TypeWord32 = TF.cast
-    integral TypeWord64 = TF.cast
+    integral :: (ScalarTensorArrayData a, TF.TensorType a, Typeable a, Show a) => IntegralType b -> TensorArrayData a -> TensorArrayData b
+    integral TypeInt    = Sh.wrap "cast" TF.cast
+    integral TypeInt8   = Sh.wrap "cast" TF.cast
+    integral TypeInt16  = Sh.wrap "cast" TF.cast
+    integral TypeInt32  = Sh.wrap "cast" TF.cast
+    integral TypeInt64  = Sh.wrap "cast" TF.cast
+    integral TypeWord   = Sh.wrap "cast" TF.cast
+    integral TypeWord8  = Sh.wrap "cast" TF.cast
+    integral TypeWord16 = Sh.wrap "cast" TF.cast
+    integral TypeWord32 = Sh.wrap "cast" TF.cast
+    integral TypeWord64 = Sh.wrap "cast" TF.cast
 
 ceiling :: FloatingType a -> IntegralType b -> TensorArrayData a -> TensorArrayData b
 ceiling = floating
   where
     floating :: FloatingType a -> IntegralType b -> TensorArrayData a -> TensorArrayData b
-    floating TypeFloat  t = integral t . TF.ceil
-    floating TypeDouble t = integral t . TF.ceil
+    floating TypeFloat  t = integral t . Sh.wrap "ceil" TF.ceil
+    floating TypeDouble t = integral t . Sh.wrap "ceil" TF.ceil
     floating TypeHalf   _ = unsupported "half-precision floating point"
 
-    integral :: (ScalarTensorArrayData a, TF.TensorType a) => IntegralType b -> TensorArrayData a -> TensorArrayData b
-    integral TypeInt    = TF.cast
-    integral TypeInt8   = TF.cast
-    integral TypeInt16  = TF.cast
-    integral TypeInt32  = TF.cast
-    integral TypeInt64  = TF.cast
-    integral TypeWord   = TF.cast
-    integral TypeWord8  = TF.cast
-    integral TypeWord16 = TF.cast
-    integral TypeWord32 = TF.cast
-    integral TypeWord64 = TF.cast
+    integral :: (ScalarTensorArrayData a, TF.TensorType a, Typeable a, Show a) => IntegralType b -> TensorArrayData a -> TensorArrayData b
+    integral TypeInt    = Sh.wrap "cast" TF.cast
+    integral TypeInt8   = Sh.wrap "cast" TF.cast
+    integral TypeInt16  = Sh.wrap "cast" TF.cast
+    integral TypeInt32  = Sh.wrap "cast" TF.cast
+    integral TypeInt64  = Sh.wrap "cast" TF.cast
+    integral TypeWord   = Sh.wrap "cast" TF.cast
+    integral TypeWord8  = Sh.wrap "cast" TF.cast
+    integral TypeWord16 = Sh.wrap "cast" TF.cast
+    integral TypeWord32 = Sh.wrap "cast" TF.cast
+    integral TypeWord64 = Sh.wrap "cast" TF.cast
 
 atan2 :: forall t. FloatingType t -> TensorArrayData (t, t) -> TensorArrayData t
 atan2 = uncurry @t @t . floating
   where
     floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t -> TensorArrayData t
-    floating TypeFloat  = TF.atan2
-    floating TypeDouble = TF.atan2
+    floating TypeFloat  = Sh.wrap "atan2" TF.atan2
+    floating TypeDouble = Sh.wrap "atan2" TF.atan2
     floating TypeHalf   = unsupported "half-precision floating point"
 
 isNaN :: FloatingType t -> TensorArrayData t -> TensorArrayData PrimBool
 isNaN = floating
   where
     floating :: FloatingType t -> TensorArrayData t -> TensorArrayData PrimBool
-    floating TypeFloat  = TF.cast . TF.isNan
-    floating TypeDouble = TF.cast . TF.isNan
+    floating TypeFloat  = Sh.wrap "cast" TF.cast . Sh.wrap "isNan" TF.isNan
+    floating TypeDouble = Sh.wrap "cast" TF.cast . Sh.wrap "isNan" TF.isNan
     floating TypeHalf   = unsupported "half-precision floating point"
 
 isInfinite :: FloatingType t -> TensorArrayData t -> TensorArrayData PrimBool
 isInfinite = floating
   where
     floating :: FloatingType t -> TensorArrayData t -> TensorArrayData PrimBool
-    floating TypeFloat  = TF.cast . TF.isInf
-    floating TypeDouble = TF.cast . TF.isInf
+    floating TypeFloat  = Sh.wrap "cast" TF.cast . Sh.wrap "isInf" TF.isInf
+    floating TypeDouble = Sh.wrap "cast" TF.cast . Sh.wrap "isInf" TF.isInf
     floating TypeHalf   = unsupported "half-precision floating point"
 
 lt :: forall t. SingleType t -> TensorArrayData (t, t) -> TensorArrayData PrimBool
@@ -598,20 +600,20 @@ lt = uncurry @t @t . single
     num (FloatingNumType t) = floating t
 
     integral :: IntegralType t -> TensorArrayData t -> TensorArrayData t -> TensorArrayData PrimBool
-    integral TypeInt    = TF.cast $$ TF.less
-    integral TypeInt8   = TF.cast $$ TF.less
-    integral TypeInt16  = TF.cast $$ TF.less
-    integral TypeInt32  = TF.cast $$ TF.less
-    integral TypeInt64  = TF.cast $$ TF.less
-    integral TypeWord   = TF.cast $$ TF.less
-    integral TypeWord8  = TF.cast $$ TF.less
-    integral TypeWord16 = TF.cast $$ TF.less
-    integral TypeWord32 = TF.cast $$ TF.less
-    integral TypeWord64 = TF.cast $$ TF.less
+    integral TypeInt    = Sh.wrap "cast" TF.cast $$ Sh.wrap "less" TF.less
+    integral TypeInt8   = Sh.wrap "cast" TF.cast $$ Sh.wrap "less" TF.less
+    integral TypeInt16  = Sh.wrap "cast" TF.cast $$ Sh.wrap "less" TF.less
+    integral TypeInt32  = Sh.wrap "cast" TF.cast $$ Sh.wrap "less" TF.less
+    integral TypeInt64  = Sh.wrap "cast" TF.cast $$ Sh.wrap "less" TF.less
+    integral TypeWord   = Sh.wrap "cast" TF.cast $$ Sh.wrap "less" TF.less
+    integral TypeWord8  = Sh.wrap "cast" TF.cast $$ Sh.wrap "less" TF.less
+    integral TypeWord16 = Sh.wrap "cast" TF.cast $$ Sh.wrap "less" TF.less
+    integral TypeWord32 = Sh.wrap "cast" TF.cast $$ Sh.wrap "less" TF.less
+    integral TypeWord64 = Sh.wrap "cast" TF.cast $$ Sh.wrap "less" TF.less
 
     floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t -> TensorArrayData PrimBool
-    floating TypeFloat  = TF.cast $$ TF.less
-    floating TypeDouble = TF.cast $$ TF.less
+    floating TypeFloat  = Sh.wrap "cast" TF.cast $$ Sh.wrap "less" TF.less
+    floating TypeDouble = Sh.wrap "cast" TF.cast $$ Sh.wrap "less" TF.less
     floating TypeHalf   = unsupported "half-precision floating point"
 
 gt :: forall t. SingleType t -> TensorArrayData (t, t) -> TensorArrayData PrimBool
@@ -625,20 +627,20 @@ gt = uncurry @t @t . single
     num (FloatingNumType t) = floating t
 
     integral :: IntegralType t -> TensorArrayData t -> TensorArrayData t -> TensorArrayData PrimBool
-    integral TypeInt    = TF.cast $$ TF.greater
-    integral TypeInt8   = TF.cast $$ TF.greater
-    integral TypeInt16  = TF.cast $$ TF.greater
-    integral TypeInt32  = TF.cast $$ TF.greater
-    integral TypeInt64  = TF.cast $$ TF.greater
-    integral TypeWord   = TF.cast $$ TF.greater
-    integral TypeWord8  = TF.cast $$ TF.greater
-    integral TypeWord16 = TF.cast $$ TF.greater
-    integral TypeWord32 = TF.cast $$ TF.greater
-    integral TypeWord64 = TF.cast $$ TF.greater
+    integral TypeInt    = Sh.wrap "cast" TF.cast $$ Sh.wrap "greater" TF.greater
+    integral TypeInt8   = Sh.wrap "cast" TF.cast $$ Sh.wrap "greater" TF.greater
+    integral TypeInt16  = Sh.wrap "cast" TF.cast $$ Sh.wrap "greater" TF.greater
+    integral TypeInt32  = Sh.wrap "cast" TF.cast $$ Sh.wrap "greater" TF.greater
+    integral TypeInt64  = Sh.wrap "cast" TF.cast $$ Sh.wrap "greater" TF.greater
+    integral TypeWord   = Sh.wrap "cast" TF.cast $$ Sh.wrap "greater" TF.greater
+    integral TypeWord8  = Sh.wrap "cast" TF.cast $$ Sh.wrap "greater" TF.greater
+    integral TypeWord16 = Sh.wrap "cast" TF.cast $$ Sh.wrap "greater" TF.greater
+    integral TypeWord32 = Sh.wrap "cast" TF.cast $$ Sh.wrap "greater" TF.greater
+    integral TypeWord64 = Sh.wrap "cast" TF.cast $$ Sh.wrap "greater" TF.greater
 
     floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t -> TensorArrayData PrimBool
-    floating TypeFloat  = TF.cast $$ TF.greater
-    floating TypeDouble = TF.cast $$ TF.greater
+    floating TypeFloat  = Sh.wrap "cast" TF.cast $$ Sh.wrap "greater" TF.greater
+    floating TypeDouble = Sh.wrap "cast" TF.cast $$ Sh.wrap "greater" TF.greater
     floating TypeHalf   = unsupported "half-precision floating point"
 
 lte :: forall t. SingleType t -> TensorArrayData (t, t) -> TensorArrayData PrimBool
@@ -652,20 +654,20 @@ lte = uncurry @t @t . single
     num (FloatingNumType t) = floating t
 
     integral :: IntegralType t -> TensorArrayData t -> TensorArrayData t -> TensorArrayData PrimBool
-    integral TypeInt    = TF.cast $$ TF.lessEqual
-    integral TypeInt8   = TF.cast $$ TF.lessEqual
-    integral TypeInt16  = TF.cast $$ TF.lessEqual
-    integral TypeInt32  = TF.cast $$ TF.lessEqual
-    integral TypeInt64  = TF.cast $$ TF.lessEqual
-    integral TypeWord   = TF.cast $$ TF.lessEqual
-    integral TypeWord8  = TF.cast $$ TF.lessEqual
-    integral TypeWord16 = TF.cast $$ TF.lessEqual
-    integral TypeWord32 = TF.cast $$ TF.lessEqual
-    integral TypeWord64 = TF.cast $$ TF.lessEqual
+    integral TypeInt    = Sh.wrap "cast" TF.cast $$ Sh.wrap "lessEqual" TF.lessEqual
+    integral TypeInt8   = Sh.wrap "cast" TF.cast $$ Sh.wrap "lessEqual" TF.lessEqual
+    integral TypeInt16  = Sh.wrap "cast" TF.cast $$ Sh.wrap "lessEqual" TF.lessEqual
+    integral TypeInt32  = Sh.wrap "cast" TF.cast $$ Sh.wrap "lessEqual" TF.lessEqual
+    integral TypeInt64  = Sh.wrap "cast" TF.cast $$ Sh.wrap "lessEqual" TF.lessEqual
+    integral TypeWord   = Sh.wrap "cast" TF.cast $$ Sh.wrap "lessEqual" TF.lessEqual
+    integral TypeWord8  = Sh.wrap "cast" TF.cast $$ Sh.wrap "lessEqual" TF.lessEqual
+    integral TypeWord16 = Sh.wrap "cast" TF.cast $$ Sh.wrap "lessEqual" TF.lessEqual
+    integral TypeWord32 = Sh.wrap "cast" TF.cast $$ Sh.wrap "lessEqual" TF.lessEqual
+    integral TypeWord64 = Sh.wrap "cast" TF.cast $$ Sh.wrap "lessEqual" TF.lessEqual
 
     floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t -> TensorArrayData PrimBool
-    floating TypeFloat  = TF.cast $$ TF.lessEqual
-    floating TypeDouble = TF.cast $$ TF.lessEqual
+    floating TypeFloat  = Sh.wrap "cast" TF.cast $$ Sh.wrap "lessEqual" TF.lessEqual
+    floating TypeDouble = Sh.wrap "cast" TF.cast $$ Sh.wrap "lessEqual" TF.lessEqual
     floating TypeHalf   = unsupported "half-precision floating point"
 
 gte :: forall t. SingleType t -> TensorArrayData (t, t) -> TensorArrayData PrimBool
@@ -679,20 +681,20 @@ gte = uncurry @ t @t . single
     num (FloatingNumType t) = floating t
 
     integral :: IntegralType t -> TensorArrayData t -> TensorArrayData t -> TensorArrayData PrimBool
-    integral TypeInt    = TF.cast $$ TF.greaterEqual
-    integral TypeInt8   = TF.cast $$ TF.greaterEqual
-    integral TypeInt16  = TF.cast $$ TF.greaterEqual
-    integral TypeInt32  = TF.cast $$ TF.greaterEqual
-    integral TypeInt64  = TF.cast $$ TF.greaterEqual
-    integral TypeWord   = TF.cast $$ TF.greaterEqual
-    integral TypeWord8  = TF.cast $$ TF.greaterEqual
-    integral TypeWord16 = TF.cast $$ TF.greaterEqual
-    integral TypeWord32 = TF.cast $$ TF.greaterEqual
-    integral TypeWord64 = TF.cast $$ TF.greaterEqual
+    integral TypeInt    = Sh.wrap "cast" TF.cast $$ Sh.wrap "greaterEqual" TF.greaterEqual
+    integral TypeInt8   = Sh.wrap "cast" TF.cast $$ Sh.wrap "greaterEqual" TF.greaterEqual
+    integral TypeInt16  = Sh.wrap "cast" TF.cast $$ Sh.wrap "greaterEqual" TF.greaterEqual
+    integral TypeInt32  = Sh.wrap "cast" TF.cast $$ Sh.wrap "greaterEqual" TF.greaterEqual
+    integral TypeInt64  = Sh.wrap "cast" TF.cast $$ Sh.wrap "greaterEqual" TF.greaterEqual
+    integral TypeWord   = Sh.wrap "cast" TF.cast $$ Sh.wrap "greaterEqual" TF.greaterEqual
+    integral TypeWord8  = Sh.wrap "cast" TF.cast $$ Sh.wrap "greaterEqual" TF.greaterEqual
+    integral TypeWord16 = Sh.wrap "cast" TF.cast $$ Sh.wrap "greaterEqual" TF.greaterEqual
+    integral TypeWord32 = Sh.wrap "cast" TF.cast $$ Sh.wrap "greaterEqual" TF.greaterEqual
+    integral TypeWord64 = Sh.wrap "cast" TF.cast $$ Sh.wrap "greaterEqual" TF.greaterEqual
 
     floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t -> TensorArrayData PrimBool
-    floating TypeFloat  = TF.cast $$ TF.greaterEqual
-    floating TypeDouble = TF.cast $$ TF.greaterEqual
+    floating TypeFloat  = Sh.wrap "cast" TF.cast $$ Sh.wrap "greaterEqual" TF.greaterEqual
+    floating TypeDouble = Sh.wrap "cast" TF.cast $$ Sh.wrap "greaterEqual" TF.greaterEqual
     floating TypeHalf   = unsupported "half-precision floating point"
 
 eq :: forall t. SingleType t -> TensorArrayData (t, t) -> TensorArrayData PrimBool
@@ -706,20 +708,20 @@ eq = uncurry @t @t . single
     num (FloatingNumType t) = floating t
 
     integral :: IntegralType t -> TensorArrayData t -> TensorArrayData t -> TensorArrayData PrimBool
-    integral TypeInt    = TF.cast $$ TF.equal
-    integral TypeInt8   = TF.cast $$ TF.equal
-    integral TypeInt16  = TF.cast $$ TF.equal
-    integral TypeInt32  = TF.cast $$ TF.equal
-    integral TypeInt64  = TF.cast $$ TF.equal
-    integral TypeWord   = TF.cast $$ TF.equal
-    integral TypeWord8  = TF.cast $$ TF.equal
-    integral TypeWord16 = TF.cast $$ TF.equal
-    integral TypeWord32 = TF.cast $$ TF.equal
-    integral TypeWord64 = TF.cast $$ TF.equal
+    integral TypeInt    = Sh.wrap "cast" TF.cast $$ Sh.wrap "equal" TF.equal
+    integral TypeInt8   = Sh.wrap "cast" TF.cast $$ Sh.wrap "equal" TF.equal
+    integral TypeInt16  = Sh.wrap "cast" TF.cast $$ Sh.wrap "equal" TF.equal
+    integral TypeInt32  = Sh.wrap "cast" TF.cast $$ Sh.wrap "equal" TF.equal
+    integral TypeInt64  = Sh.wrap "cast" TF.cast $$ Sh.wrap "equal" TF.equal
+    integral TypeWord   = Sh.wrap "cast" TF.cast $$ Sh.wrap "equal" TF.equal
+    integral TypeWord8  = Sh.wrap "cast" TF.cast $$ Sh.wrap "equal" TF.equal
+    integral TypeWord16 = Sh.wrap "cast" TF.cast $$ Sh.wrap "equal" TF.equal
+    integral TypeWord32 = Sh.wrap "cast" TF.cast $$ Sh.wrap "equal" TF.equal
+    integral TypeWord64 = Sh.wrap "cast" TF.cast $$ Sh.wrap "equal" TF.equal
 
     floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t -> TensorArrayData PrimBool
-    floating TypeFloat  = TF.cast $$ TF.equal
-    floating TypeDouble = TF.cast $$ TF.equal
+    floating TypeFloat  = Sh.wrap "cast" TF.cast $$ Sh.wrap "equal" TF.equal
+    floating TypeDouble = Sh.wrap "cast" TF.cast $$ Sh.wrap "equal" TF.equal
     floating TypeHalf   = unsupported "half-precision floating point"
 
 neq :: forall t. SingleType t -> TensorArrayData (t, t) -> TensorArrayData PrimBool
@@ -733,20 +735,20 @@ neq = uncurry @t @t . single
     num (FloatingNumType t) = floating t
 
     integral :: IntegralType t -> TensorArrayData t -> TensorArrayData t -> TensorArrayData PrimBool
-    integral TypeInt    = TF.cast $$ TF.notEqual
-    integral TypeInt8   = TF.cast $$ TF.notEqual
-    integral TypeInt16  = TF.cast $$ TF.notEqual
-    integral TypeInt32  = TF.cast $$ TF.notEqual
-    integral TypeInt64  = TF.cast $$ TF.notEqual
-    integral TypeWord   = TF.cast $$ TF.notEqual
-    integral TypeWord8  = TF.cast $$ TF.notEqual
-    integral TypeWord16 = TF.cast $$ TF.notEqual
-    integral TypeWord32 = TF.cast $$ TF.notEqual
-    integral TypeWord64 = TF.cast $$ TF.notEqual
+    integral TypeInt    = Sh.wrap "cast" TF.cast $$ Sh.wrap "notEqual" TF.notEqual
+    integral TypeInt8   = Sh.wrap "cast" TF.cast $$ Sh.wrap "notEqual" TF.notEqual
+    integral TypeInt16  = Sh.wrap "cast" TF.cast $$ Sh.wrap "notEqual" TF.notEqual
+    integral TypeInt32  = Sh.wrap "cast" TF.cast $$ Sh.wrap "notEqual" TF.notEqual
+    integral TypeInt64  = Sh.wrap "cast" TF.cast $$ Sh.wrap "notEqual" TF.notEqual
+    integral TypeWord   = Sh.wrap "cast" TF.cast $$ Sh.wrap "notEqual" TF.notEqual
+    integral TypeWord8  = Sh.wrap "cast" TF.cast $$ Sh.wrap "notEqual" TF.notEqual
+    integral TypeWord16 = Sh.wrap "cast" TF.cast $$ Sh.wrap "notEqual" TF.notEqual
+    integral TypeWord32 = Sh.wrap "cast" TF.cast $$ Sh.wrap "notEqual" TF.notEqual
+    integral TypeWord64 = Sh.wrap "cast" TF.cast $$ Sh.wrap "notEqual" TF.notEqual
 
     floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t -> TensorArrayData PrimBool
-    floating TypeFloat  = TF.cast $$ TF.notEqual
-    floating TypeDouble = TF.cast $$ TF.notEqual
+    floating TypeFloat  = Sh.wrap "cast" TF.cast $$ Sh.wrap "notEqual" TF.notEqual
+    floating TypeDouble = Sh.wrap "cast" TF.cast $$ Sh.wrap "notEqual" TF.notEqual
     floating TypeHalf   = unsupported "half-precision floating point"
 
 min :: forall t. SingleType t -> TensorArrayData (t, t) -> TensorArrayData t
@@ -760,20 +762,20 @@ min = uncurry @t @t . single
     num (FloatingNumType t) = floating t
 
     integral :: IntegralType t -> TensorArrayData t -> TensorArrayData t -> TensorArrayData t
-    integral TypeInt    = TF.minimum
+    integral TypeInt    = Sh.wrap "minimum" TF.minimum
     integral TypeInt8   = excluded
-    integral TypeInt16  = TF.minimum
-    integral TypeInt32  = TF.minimum
-    integral TypeInt64  = TF.minimum
-    integral TypeWord   = TF.minimum
-    integral TypeWord8  = TF.minimum
-    integral TypeWord16 = TF.minimum
-    integral TypeWord32 = TF.minimum
-    integral TypeWord64 = TF.minimum
+    integral TypeInt16  = Sh.wrap "minimum" TF.minimum
+    integral TypeInt32  = Sh.wrap "minimum" TF.minimum
+    integral TypeInt64  = Sh.wrap "minimum" TF.minimum
+    integral TypeWord   = Sh.wrap "minimum" TF.minimum
+    integral TypeWord8  = Sh.wrap "minimum" TF.minimum
+    integral TypeWord16 = Sh.wrap "minimum" TF.minimum
+    integral TypeWord32 = Sh.wrap "minimum" TF.minimum
+    integral TypeWord64 = Sh.wrap "minimum" TF.minimum
 
     floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t -> TensorArrayData t
-    floating TypeFloat  = TF.minimum
-    floating TypeDouble = TF.minimum
+    floating TypeFloat  = Sh.wrap "minimum" TF.minimum
+    floating TypeDouble = Sh.wrap "minimum" TF.minimum
     floating TypeHalf   = unsupported "half-precision floating point"
 
 max :: forall t. SingleType t -> TensorArrayData (t, t) -> TensorArrayData t
@@ -787,30 +789,30 @@ max = uncurry @t @t . single
     num (FloatingNumType t) = floating t
 
     integral :: IntegralType t -> TensorArrayData t -> TensorArrayData t -> TensorArrayData t
-    integral TypeInt    = TF.maximum
+    integral TypeInt    = Sh.wrap "maximum" TF.maximum
     integral TypeInt8   = excluded
-    integral TypeInt16  = TF.maximum
-    integral TypeInt32  = TF.maximum
-    integral TypeInt64  = TF.maximum
-    integral TypeWord   = TF.maximum
-    integral TypeWord8  = TF.maximum
-    integral TypeWord16 = TF.maximum
-    integral TypeWord32 = TF.maximum
-    integral TypeWord64 = TF.maximum
+    integral TypeInt16  = Sh.wrap "maximum" TF.maximum
+    integral TypeInt32  = Sh.wrap "maximum" TF.maximum
+    integral TypeInt64  = Sh.wrap "maximum" TF.maximum
+    integral TypeWord   = Sh.wrap "maximum" TF.maximum
+    integral TypeWord8  = Sh.wrap "maximum" TF.maximum
+    integral TypeWord16 = Sh.wrap "maximum" TF.maximum
+    integral TypeWord32 = Sh.wrap "maximum" TF.maximum
+    integral TypeWord64 = Sh.wrap "maximum" TF.maximum
 
     floating :: FloatingType t -> TensorArrayData t -> TensorArrayData t -> TensorArrayData t
-    floating TypeFloat  = TF.maximum
-    floating TypeDouble = TF.maximum
+    floating TypeFloat  = Sh.wrap "maximum" TF.maximum
+    floating TypeDouble = Sh.wrap "maximum" TF.maximum
     floating TypeHalf   = unsupported "half-precision floating point"
 
 land :: TensorArrayData PrimBool -> TensorArrayData PrimBool -> TensorArrayData PrimBool
-land x y = TF.cast $ TF.logicalAnd (TF.cast x) (TF.cast y)
+land x y = Sh.wrap "cast" TF.cast $ Sh.wrap "logicalAnd" TF.logicalAnd (Sh.wrap "cast" TF.cast x) (Sh.wrap "cast" TF.cast y)
 
 lor :: TensorArrayData PrimBool -> TensorArrayData PrimBool -> TensorArrayData PrimBool
-lor x y = TF.cast $ TF.logicalOr (TF.cast x) (TF.cast y)
+lor x y = Sh.wrap "cast" TF.cast $ Sh.wrap "logicalOr" TF.logicalOr (Sh.wrap "cast" TF.cast x) (Sh.wrap "cast" TF.cast y)
 
 lnot :: TensorArrayData PrimBool -> TensorArrayData PrimBool
-lnot = TF.cast . TF.logicalNot . TF.cast
+lnot = Sh.wrap "cast" TF.cast . Sh.wrap "logicalNot" TF.logicalNot . Sh.wrap "cast" TF.cast
 
 fromIntegral :: IntegralType a -> NumType b -> TensorArrayData a -> TensorArrayData b
 fromIntegral = integral
@@ -827,25 +829,25 @@ fromIntegral = integral
     integral TypeWord32 = num
     integral TypeWord64 = num
 
-    num :: (ScalarTensorArrayData a, TF.TensorType a) => NumType b -> TensorArrayData a -> TensorArrayData b
+    num :: (ScalarTensorArrayData a, TF.TensorType a, Typeable a, Show a) => NumType b -> TensorArrayData a -> TensorArrayData b
     num (IntegralNumType t) = integral' t
     num (FloatingNumType t) = floating' t
 
-    integral' :: (ScalarTensorArrayData a, TF.TensorType a) => IntegralType b -> TensorArrayData a -> TensorArrayData b
-    integral' TypeInt    = TF.cast
-    integral' TypeInt8   = TF.cast
-    integral' TypeInt16  = TF.cast
-    integral' TypeInt32  = TF.cast
-    integral' TypeInt64  = TF.cast
-    integral' TypeWord   = TF.cast
-    integral' TypeWord8  = TF.cast
-    integral' TypeWord16 = TF.cast
-    integral' TypeWord32 = TF.cast
-    integral' TypeWord64 = TF.cast
+    integral' :: (ScalarTensorArrayData a, TF.TensorType a, Typeable a, Show a) => IntegralType b -> TensorArrayData a -> TensorArrayData b
+    integral' TypeInt    = Sh.wrap "cast" TF.cast
+    integral' TypeInt8   = Sh.wrap "cast" TF.cast
+    integral' TypeInt16  = Sh.wrap "cast" TF.cast
+    integral' TypeInt32  = Sh.wrap "cast" TF.cast
+    integral' TypeInt64  = Sh.wrap "cast" TF.cast
+    integral' TypeWord   = Sh.wrap "cast" TF.cast
+    integral' TypeWord8  = Sh.wrap "cast" TF.cast
+    integral' TypeWord16 = Sh.wrap "cast" TF.cast
+    integral' TypeWord32 = Sh.wrap "cast" TF.cast
+    integral' TypeWord64 = Sh.wrap "cast" TF.cast
 
-    floating' :: (ScalarTensorArrayData a, TF.TensorType a) => FloatingType b -> TensorArrayData a -> TensorArrayData b
-    floating' TypeFloat  = TF.cast
-    floating' TypeDouble = TF.cast
+    floating' :: (ScalarTensorArrayData a, TF.TensorType a, Typeable a, Show a) => FloatingType b -> TensorArrayData a -> TensorArrayData b
+    floating' TypeFloat  = Sh.wrap "cast" TF.cast
+    floating' TypeDouble = Sh.wrap "cast" TF.cast
     floating' TypeHalf   = unsupported "half-precision floating point"
 
 toFloating :: NumType a -> FloatingType b -> TensorArrayData a -> TensorArrayData b
@@ -872,8 +874,8 @@ toFloating = num
     floating TypeDouble = floating'
     floating TypeHalf   = unsupported "half-precision floating point"
 
-    floating' :: (ScalarTensorArrayData a, TF.TensorType a) => FloatingType b -> TensorArrayData a -> TensorArrayData b
-    floating' TypeFloat  = TF.cast
-    floating' TypeDouble = TF.cast
+    floating' :: (ScalarTensorArrayData a, TF.TensorType a, Typeable a, Show a) => FloatingType b -> TensorArrayData a -> TensorArrayData b
+    floating' TypeFloat  = Sh.wrap "cast" TF.cast
+    floating' TypeDouble = Sh.wrap "cast" TF.cast
     floating' TypeHalf   = unsupported "half-precision floating point"
 

@@ -11,11 +11,13 @@ module Data.Array.Accelerate.TensorFlow.TypeDicts (
 
 import Data.Array.Accelerate.TensorFlow.CodeGen.Base
 import Data.Array.Accelerate.TensorFlow.CodeGen.Tensor
+import qualified Data.Array.Accelerate.TensorFlow.CodeGen.Tensor.Shim as Sh
 
 import Data.Array.Accelerate.Array.Data (GArrayDataR)
 import Data.Array.Accelerate.Array.Unique (UniqueArray)
 import Data.Array.Accelerate.Type
 
+import Data.Typeable
 import Foreign.Storable
 import qualified TensorFlow.Core                                    as TF
 import Data.ByteString.Char8
@@ -35,10 +37,12 @@ instance {-# OVERLAPPABLE #-} Convertable a a where
 
 type TypeDictsFor t s =
   (Storable t
+  ,Typeable s
+  ,Show s
   ,IsScalar t
   ,s ~ ScalarTensorDataR t
   ,TF.TensorType s
-  ,TArrayDataR (TF.Tensor TF.Build) t ~ TF.Tensor TF.Build s
+  ,TArrayDataR Sh.Tensor t ~ Sh.Tensor s
   ,GArrayDataR UniqueArray t ~ UniqueArray t
   ,s TF./= ByteString
   ,s TF./= Bool

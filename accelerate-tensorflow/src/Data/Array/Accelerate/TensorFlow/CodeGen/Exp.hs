@@ -20,6 +20,7 @@ import Data.Array.Accelerate.TensorFlow.CodeGen.Arithmetic          as A
 import Data.Array.Accelerate.TensorFlow.CodeGen.Base
 import Data.Array.Accelerate.TensorFlow.CodeGen.Environment
 import Data.Array.Accelerate.TensorFlow.CodeGen.Tensor
+import qualified Data.Array.Accelerate.TensorFlow.CodeGen.Tensor.Shim as Sh
 import Data.Array.Accelerate.TensorFlow.TypeDicts
 
 import Data.Array.Accelerate.AST
@@ -56,7 +57,7 @@ buildOpenExp contextR context env aenv =
             go :: TypeR s -> TensorArrayData s -> TensorArrayData s
             go TupRunit         ()     = ()
             go (TupRpair aR bR) (a, b) = (go aR a, go bR b)
-            go (TupRsingle aR)  a      = buildTypeDictsScalar aR $ TF.fill sh_ a
+            go (TupRsingle aR)  a      = buildTypeDictsScalar aR $ Sh.wrap "fill" TF.fill sh_ a
         in
         go
 
@@ -65,14 +66,14 @@ buildOpenExp contextR context env aenv =
             -> OpenExp env aenv t
             -> TensorArrayData t
       condL p t e =
-        let p' = TF.cast @_ @_ @Bool $ buildE p
+        let p' = Sh.wrap "cast" (TF.cast @_ @_ @Bool) $ buildE p
             t' = buildE t
             e' = buildE e
 
             go :: TypeR s -> TensorArrayData s -> TensorArrayData s -> TensorArrayData s
             go TupRunit         ()       ()       = ()
             go (TupRpair tA tB) (a1, b1) (a2, b2) = (go tA a1 a2, go tB b1 b2)
-            go (TupRsingle eR)  a        b        = buildTypeDictsScalar eR $ TF.selectV2 p' a b
+            go (TupRsingle eR)  a        b        = buildTypeDictsScalar eR $ Sh.wrap "selectV2" TF.selectV2 p' a b
         in
         go (expType t) t' e'
 
@@ -88,16 +89,16 @@ buildOpenExp contextR context env aenv =
         TupRsingle t ->
           buildTypeDictsScalar t $
             let n = shapeProd shr sh  -- 0D tensor containing full size of p
-                n1 = TF.reshape n (TF.constant (TF.Shape [1]) [1 :: ScalarTensorDataR Int])
-                pflattened = TF.reshape p n1
-            in TF.gather pflattened ix
+                n1 = Sh.wrap "reshape" TF.reshape n (Sh.wrap2 "constant" TF.constant (TF.Shape [1]) [1 :: ScalarTensorDataR Int])
+                pflattened = Sh.wrap "reshape" TF.reshape p n1
+            in Sh.wrap "gather" TF.gather pflattened ix
         TupRunit -> ()
         TupRpair tl tr -> let (pl, pr) = p in ( gatherL (Tensor (ArrayR shr tl) sh pl) ix
                                               , gatherL (Tensor (ArrayR shr tr) sh pr) ix)
         where
           -- assumes tuple of zero-dimensional ints, and returns a zero-dimensional int
           shapeProd :: ShapeR sh -> TensorShape sh -> TensorArrayData Int
-          shapeProd ShapeRz () = TF.constant (TF.Shape []) [1]
+          shapeProd ShapeRz () = Sh.wrap1 "scalar" TF.scalar 1
           shapeProd (ShapeRsnoc shr) (sh, n) = A.mul (IntegralNumType TypeInt) (n, shapeProd shr sh)
   in
   \case
@@ -109,7 +110,7 @@ buildOpenExp contextR context env aenv =
     VecUnpack{}                   -> unsupported "SIMD-vector types"
     ToIndex shR sh ix             -> let
         go :: ShapeR sh -> TensorArrayData sh -> TensorArrayData sh -> TensorArrayData Int
-        go ShapeRz _ _ = 0
+        go ShapeRz _ _ = fillL (TupRsingle (scalarType @Int)) (Sh.wrap1 "scalar" TF.scalar 0)
         go (ShapeRsnoc shr) (sh,n) (ix,i) = i + n * go shr sh ix
       in go shR (buildE sh) (buildE ix)
     FromIndex shR sh i            -> let
@@ -138,30 +139,30 @@ shapeToTensor
     :: (s ~ ScalarTensorDataR Int)
     => ShapeR sh
     -> TensorShape sh
-    -> TF.Tensor TF.Build s
-shapeToTensor ShapeRz              ()       = TF.constant (TF.Shape [0]) []
-shapeToTensor (ShapeRsnoc ShapeRz) ((), sh) = TF.reshape sh (TF.constant (TF.Shape [1]) [1 :: ScalarTensorDataR Int])
+    -> Sh.Tensor s
+shapeToTensor ShapeRz              ()       = Sh.wrap2 "constant" TF.constant (TF.Shape [0]) []
+shapeToTensor (ShapeRsnoc ShapeRz) ((), sh) = Sh.wrap "reshape" TF.reshape sh (Sh.wrap2 "constant" TF.constant (TF.Shape [1]) [1 :: ScalarTensorDataR Int])
 shapeToTensor shR                  sh       =
   let go :: ShapeR sh -> TensorShape sh
-         -> [TF.Tensor TF.Build (ScalarTensorDataR Int)] -> [TF.Tensor TF.Build (ScalarTensorDataR Int)]
+         -> [Sh.Tensor (ScalarTensorDataR Int)] -> [Sh.Tensor (ScalarTensorDataR Int)]
       go ShapeRz         ()     acc = acc
       go (ShapeRsnoc tR) (t, h) acc = go tR t (h : acc)
---   in TF.pack (go shR sh [])
+--   in Sh.wrapPack (go shR sh [])
 -- shapeToTensor
 --     :: (s ~ ScalarTensorDataR Int)
 --     => ShapeR sh
 --     -> TensorShape sh
---     -> TF.Tensor TF.Build s
+--     -> Sh.Tensor s
 -- shapeToTensor ShapeRz              ()       = TF.constant (TF.Shape [1]) [1]
 -- shapeToTensor (ShapeRsnoc ShapeRz) ((), sh) = sh
 -- shapeToTensor shR                  sh       =
 --   let
---       go :: (s ~ ScalarTensorDataR Int) => ShapeR sh -> TensorShape sh -> [TF.Tensor TF.Build s] -> [TF.Tensor TF.Build s]
+--       go :: (s ~ ScalarTensorDataR Int) => ShapeR sh -> TensorShape sh -> [Sh.Tensor s] -> [Sh.Tensor s]
 --       go ShapeRz         ()     acc = acc
 --       go (ShapeRsnoc tR) (t, h) acc = go tR t (h : acc)
 --   -- XXX: Why is this reshape necessary?
-  in TF.concat (TF.scalar 0) [ TF.reshape x (TF.constant (TF.Shape [1]) [1 :: ScalarTensorDataR Int]) | x <- go shR sh [] ]
-  
+  in Sh.wrapConcat (Sh.wrap1 "scalar" TF.scalar 0) [ Sh.wrap "reshape" TF.reshape x (Sh.wrap2 "constant" TF.constant (TF.Shape [1]) [1 :: ScalarTensorDataR Int]) | x <- go shR sh [] ]
+
 primConst
     :: ShapeR sh
     -> TensorShape sh
@@ -183,9 +184,9 @@ constant
     -> TensorShape sh
     -> t
     -> TensorArrayData t
-constant shR eR sh =
+constant shR eR sh x =
   let sh_ = shapeToTensor shR sh
-  in buildTypeDictsScalar eR (TF.fill sh_ . TF.scalar . convertConvertable)
+  in buildTypeDictsScalar eR $ Sh.wrap "fill" TF.fill sh_ $ Sh.wrap1 "scalar" TF.scalar $ convertConvertable x
 
 primFun
     :: forall a b.

@@ -33,6 +33,7 @@ import Data.Array.Accelerate.TensorFlow.CodeGen.Environment
 import Data.Array.Accelerate.TensorFlow.CodeGen.Exp
 import Data.Array.Accelerate.TensorFlow.CodeGen.Foreign
 import Data.Array.Accelerate.TensorFlow.CodeGen.Tensor
+import qualified Data.Array.Accelerate.TensorFlow.CodeGen.Tensor.Shim as Sh
 import Data.Array.Accelerate.TensorFlow.TypeDicts
 
 import Data.Array.Accelerate.Pretty ()
@@ -67,6 +68,7 @@ import qualified TensorFlow.Types                                   as TF
 
 import Control.Monad.State
 import Data.ByteString.Internal                                     as B
+import Data.Complex                                                 ( Complex )
 import Data.Typeable
 import Foreign.ForeignPtr
 import Foreign.Storable
@@ -94,9 +96,10 @@ buildOpenAfun aenv (Alam lhs f) = do
             shape ShapeRz          = return ()
             shape (ShapeRsnoc shR) = do
               sz <- state $ \j ->
-                      let opName  = TF.opName .~ TF.explicitName (T.pack (printf "input%d_shape%d" i j))
+                      let name = printf "input%d_shape%d" i j
+                          opName  = TF.opName .~ TF.explicitName (T.pack name)
                           opShape = TF.opAttr "shape" .~ TF.Shape [1]
-                      in (TF.placeholder' (opShape . opName), j+1)
+                      in (Sh.wrap1 "placeholder'" (\_ -> TF.placeholder' (opShape . opName)) name, j+1)
               sh <- shape shR
               return (sh, sz)
 
@@ -105,8 +108,11 @@ buildOpenAfun aenv (Alam lhs f) = do
             array (TupRpair aR bR) = (,) <$> array aR <*> array bR
             array (TupRsingle aR)  = buildTypeDictsScalar aR placeholder
               where
-                placeholder :: TF.TensorType t => State Int (TF.Tensor TF.Build t)
-                placeholder = state $ \j -> (TF.placeholder' (TF.opName .~ TF.explicitName (T.pack (printf "input%d_adata%d" i j))), j+1)
+                placeholder :: TF.TensorType t => State Int (Sh.Tensor t)
+                placeholder =
+                  state $ \j ->
+                    let name = printf "input%d_adata%d" i j
+                    in (Sh.wrap1 "placeholder'" (\_ -> TF.placeholder' (TF.opName .~ TF.explicitName (T.pack name))) name, j+1)
         in
         (env `Apush` Tensor arrR sh' adata', i+1)
   --
@@ -127,7 +133,9 @@ buildOpenAfun aenv (Abody f) =
             shape :: ShapeR sh -> TensorShape sh -> State Int (TensorShape sh)
             shape ShapeRz         ()     = return ()
             shape (ShapeRsnoc tR) (t, h) = do
-              h' <- state $ \j -> (TF.identity' (TF.opName .~ TF.explicitName (T.pack (printf "output%d_shape%d" i j))) h, j+1)
+              h' <- state $ \j ->
+                      let name = printf "output%d_shape%d" i j
+                      in (Sh.wrap1 "identity'" (\_ -> TF.identity' (TF.opName .~ TF.explicitName (T.pack name))) name h, j+1)
               t' <- shape tR t
               return (t', h')
 
@@ -136,8 +144,11 @@ buildOpenAfun aenv (Abody f) =
             array (TupRpair aR bR) (a, b) = (,) <$> array aR a <*> array bR b
             array (TupRsingle aR)  a      = buildTypeDictsScalar aR $ label a
 
-            label :: TF.TensorType t => TF.Tensor TF.Build t -> State Int (TF.Tensor TF.Build t)
-            label t = state $ \j -> (TF.identity' (TF.opName .~ TF.explicitName (T.pack (printf "output%d_adata%d" i j))) t, j+1)
+            label :: (TF.TensorType t, Typeable t, Show t) => Sh.Tensor t -> State Int (Sh.Tensor t)
+            label t =
+              state $ \j ->
+                let name = printf "output%d_adata%d" i j
+                in (Sh.wrap1 "identity'" (\_ -> TF.identity' (TF.opName .~ TF.explicitName (T.pack name))) name t, j+1)
         in
         (Tensor (ArrayR shR eR) sh' adata', i+1)
 
@@ -170,7 +181,7 @@ buildOpenAcc aenv (OpenAcc pacc) =
         let
             shape :: ShapeR sh -> sh -> TensorShape sh
             shape ShapeRz         ()     = ()
-            shape (ShapeRsnoc tR) (t, h) = (shape tR t, TF.constant (TF.Shape []) [fromIntegral h])
+            shape (ShapeRsnoc tR) (t, h) = (shape tR t, Sh.wrap2 "constant" TF.constant (TF.Shape []) [fromIntegral h])
 
             array :: forall t'. TypeR t' -> ArrayData t' -> TensorArrayData t'
             array TupRunit ()             = ()
@@ -179,7 +190,7 @@ buildOpenAcc aenv (OpenAcc pacc) =
               where
                 tensor :: forall s t. (Storable t, s ~ ScalarTensorDataR t, TF.TensorType s)
                        => UniqueArray t
-                       -> TF.Tensor TF.Build s
+                       -> Sh.Tensor s
                 tensor ua =
                   let fp     = unsafeGetValue (uniqueArrayData ua)
                       values = B.fromForeignPtr (castForeignPtr fp) 0 (size shR sh * sizeOf (undefined :: t))
@@ -190,7 +201,7 @@ buildOpenAcc aenv (OpenAcc pacc) =
                            & TF.tensorShape.TensorShape.dim .~ [ def & TensorShape.size .~ fromIntegral x | x <- reverse $ shapeToList shR sh ]
                            & TF.tensorContent .~ values
                   in
-                  TF.const' (TF.opAttr "value" .~ node)
+                  Sh.wrap "const'" (TF.const' (TF.opAttr "value" .~ node))
 
             adata' = array adataR adata
             sh'    = shape shR sh
@@ -239,13 +250,13 @@ buildOpenAcc aenv (OpenAcc pacc) =
         | Just Refl <- isIdentity f = Tensor aR sh' ranges
         | otherwise                 = Tensor aR sh' $ buildOpenExp shR sh' (Empty `push` (lhs,ranges)) aenv e
           where 
-            linearRange = TF.range 
+            linearRange = Sh.wrap "range" TF.range
               (constant     ShapeRz scalarTypeInt () 0) 
               (buildOpenExp ShapeRz               () Empty aenv (ShapeSize shR sh))
               (constant     ShapeRz scalarTypeInt () 1)
             sh' :: TensorShape sh
             sh' = buildOpenExp ShapeRz () Empty aenv sh
-            ranges = buildOpenExp shR sh' (Empty `push` (LeftHandSideSingle scalarTypeInt, TF.reshape linearRange (shapeToTensor shR sh'))) aenv $ 
+            ranges = buildOpenExp shR sh' (Empty `push` (LeftHandSideSingle scalarTypeInt, Sh.wrap "reshape" TF.reshape linearRange (shapeToTensor shR sh'))) aenv $
               FromIndex shR (weakenE weakenEmpty sh) (Evar $ Var scalarTypeInt ZeroIdx)
 
 
@@ -272,12 +283,12 @@ buildOpenAcc aenv (OpenAcc pacc) =
             pad :: SliceIndex slix sl co sh -> TensorShape sl -> TensorShape sh
             pad SliceNil              ()       = ()
             pad (SliceAll sliceIdx)   (sl, sz) = (pad sliceIdx sl, sz)
-            pad (SliceFixed sliceIdx) sl       = (pad sliceIdx sl, TF.constant (TF.Shape [1]) [1])
+            pad (SliceFixed sliceIdx) sl       = (pad sliceIdx sl, Sh.wrap1 "scalar" TF.scalar 1)
 
             array :: TypeR s -> TensorArrayData s -> TensorArrayData s
             array TupRunit         ()     = ()
             array (TupRpair aR bR) (a, b) = (array aR a, array bR b)
-            array (TupRsingle aR)  a      = buildTypeDictsScalar aR $ TF.tile (TF.reshape a sl_) sh_
+            array (TupRsingle aR)  a      = buildTypeDictsScalar aR $ Sh.wrap "tile" TF.tile (Sh.wrap "reshape" TF.reshape a sl_) sh_
         in
         Tensor (ArrayR shR eR) sh' (array eR e')
 
@@ -314,7 +325,7 @@ buildOpenAcc aenv (OpenAcc pacc) =
         | otherwise
         = unsupported "fold"
 
-      reduceL :: (forall a. TF.OneOf '[Int8, Int16, Int32, Int64, Word8, Word16, Word32, Word64, Float, Double] a => TF.Tensor TF.Build a -> TF.Tensor TF.Build Int32 -> TF.Tensor TF.Build a)
+      reduceL :: (forall a. (TF.OneOf '[Int8, Int16, Int32, Int64, Word8, Word16, Word32, Word64, Float, Double] a, Typeable a, Show a) => Sh.Tensor a -> Sh.Tensor Int32 -> Sh.Tensor a)
               -> OpenAcc aenv (Array (sh, Int) e)
               -> Tensor sh e
       reduceL reduce acc =
@@ -323,21 +334,21 @@ buildOpenAcc aenv (OpenAcc pacc) =
             array :: TypeR t -> TensorArrayData t -> TensorArrayData t
             array TupRunit        () = ()
             array TupRpair{}      _  = unsupported "sum: product types"
-            array (TupRsingle aR) a  = buildTypeDictsScalar aR $ reduce a (TF.scalar @Int32 (-1))
+            array (TupRsingle aR) a  = buildTypeDictsScalar aR $ reduce a (Sh.wrap1 "scalar" (TF.scalar @Int32) (-1))
         in
         Tensor (ArrayR shR' eR) sh' (array eR xs')
 
       sumL :: OpenAcc aenv (Array (sh, Int) e) -> Tensor sh e
-      sumL = reduceL TF.sum
+      sumL = reduceL (Sh.wrap "sum" TF.sum)
 
       prodL :: OpenAcc aenv (Array (sh, Int) e) -> Tensor sh e
-      prodL = reduceL TF.prod
+      prodL = reduceL (Sh.wrap "prod" TF.prod)
 
       minimumL :: OpenAcc aenv (Array (sh, Int) e) -> Tensor sh e
-      minimumL = reduceL TF.min
+      minimumL = reduceL (Sh.wrap "min" TF.min)
 
       maximumL :: OpenAcc aenv (Array (sh, Int) e) -> Tensor sh e
-      maximumL = reduceL TF.max
+      maximumL = reduceL (Sh.wrap "max" TF.max)
 
       backpermuteL
           :: ShapeR sh'
@@ -384,7 +395,7 @@ buildOpenAcc aenv (OpenAcc pacc) =
             array :: TypeR t -> TensorArrayData t -> TensorArrayData t
             array TupRunit         ()     = ()
             array (TupRpair aR bR) (a, b) = (array aR a, array bR b)
-            array (TupRsingle aR)  a      = buildTypeDictsScalar aR $ TF.transpose a (TF.constant @Int32 (TF.Shape [2]) [1,0])
+            array (TupRsingle aR)  a      = buildTypeDictsScalar aR $ Sh.wrap "transpose" TF.transpose a (Sh.wrap2 "constant" (TF.constant @Int32) (TF.Shape [2]) [1,0])
         in
         Tensor (ArrayR shR eR) (((), w), h) (array eR xs)
 
@@ -433,7 +444,7 @@ buildOpenAcc aenv (OpenAcc pacc) =
 
 singleton :: ShapeR sh -> TensorShape sh
 singleton ShapeRz          = ()
-singleton (ShapeRsnoc shR) = (singleton shR, TF.constant (TF.Shape [1]) [1])
+singleton (ShapeRsnoc shR) = (singleton shR, Sh.wrap2 "constant" TF.constant (TF.Shape [1]) [1])
 
 
 data MinMax = Min | Max
@@ -445,7 +456,7 @@ tpuArgMinMax minOrMax (Tensor (ArrayR (ShapeRsnoc shR) eR) (sh, _) t) =
   Tensor (ArrayR shR $ TupRsingle scalarTypeInt32) sh (array eR t)
     where
       array :: TypeR t -> TensorArrayData t -> TensorArrayData Int32
-      array TupRunit        () = TF.scalar @Int32 0
+      array TupRunit        () = Sh.wrap1 "scalar" (TF.scalar @Int32) 0
       array TupRpair{}      _  = unsupported "argMin/Max: product types"
       array (TupRsingle aR) a  = scalar aR a
 
@@ -460,20 +471,28 @@ tpuArgMinMax minOrMax (Tensor (ArrayR (ShapeRsnoc shR) eR) (sh, _) t) =
       num (IntegralNumType t) = integral t
       num (FloatingNumType t) = floating t
 
+      choose :: (TF.OneOf '[Complex Double, Complex Float, Bool, Int16, Int32, Int64, Int8, Word16, Word32, Word64, Word8, Double, Float] t
+                ,TF.OneOf '[Int32, Int64] output_type
+                ,Typeable t, Show t)
+             => Sh.Tensor t -> Sh.Tensor output_type
+      choose x = case minOrMax of
+                   Min -> Sh.wrap "argMin" TF.argMin x (Sh.wrap1 "scalar" (TF.scalar @Int32) 0)
+                   Max -> Sh.wrap "argMax" TF.argMax x (Sh.wrap1 "scalar" (TF.scalar @Int32) 0)
+
       integral :: IntegralType t -> TensorArrayData t -> TensorArrayData Int32
-      integral TypeInt8   x = case minOrMax of Min -> TF.argMin x (TF.scalar @Int32 0); Max -> TF.argMax x (TF.scalar @Int32 0);
-      integral TypeInt16  x = case minOrMax of Min -> TF.argMin x (TF.scalar @Int32 0); Max -> TF.argMax x (TF.scalar @Int32 0);
-      integral TypeInt32  x = case minOrMax of Min -> TF.argMin x (TF.scalar @Int32 0); Max -> TF.argMax x (TF.scalar @Int32 0);
-      integral TypeInt64  x = case minOrMax of Min -> TF.argMin x (TF.scalar @Int32 0); Max -> TF.argMax x (TF.scalar @Int32 0);
-      integral TypeWord8  x = case minOrMax of Min -> TF.argMin x (TF.scalar @Int32 0); Max -> TF.argMax x (TF.scalar @Int32 0);
-      integral TypeWord16 x = case minOrMax of Min -> TF.argMin x (TF.scalar @Int32 0); Max -> TF.argMax x (TF.scalar @Int32 0);
-      integral TypeWord32 x = case minOrMax of Min -> TF.argMin x (TF.scalar @Int32 0); Max -> TF.argMax x (TF.scalar @Int32 0);
-      integral TypeWord64 x = case minOrMax of Min -> TF.argMin x (TF.scalar @Int32 0); Max -> TF.argMax x (TF.scalar @Int32 0);
-      integral TypeInt    x = case minOrMax of Min -> TF.argMin x (TF.scalar @Int32 0); Max -> TF.argMax x (TF.scalar @Int32 0);
-      integral TypeWord   x = case minOrMax of Min -> TF.argMin x (TF.scalar @Int32 0); Max -> TF.argMax x (TF.scalar @Int32 0);
+      integral TypeInt8   x = choose x
+      integral TypeInt16  x = choose x
+      integral TypeInt32  x = choose x
+      integral TypeInt64  x = choose x
+      integral TypeWord8  x = choose x
+      integral TypeWord16 x = choose x
+      integral TypeWord32 x = choose x
+      integral TypeWord64 x = choose x
+      integral TypeInt    x = choose x
+      integral TypeWord   x = choose x
 
       floating :: FloatingType t -> TensorArrayData t -> TensorArrayData Int32
-      floating TypeFloat  x = case minOrMax of Min -> TF.argMin x (TF.scalar @Int32 0); Max -> TF.argMax x (TF.scalar @Int32 0);
-      floating TypeDouble x = case minOrMax of Min -> TF.argMin x (TF.scalar @Int32 0); Max -> TF.argMax x (TF.scalar @Int32 0);
+      floating TypeFloat  x = choose x
+      floating TypeDouble x = choose x
       floating TypeHalf   _ = unsupported "half-precision floating point"
 

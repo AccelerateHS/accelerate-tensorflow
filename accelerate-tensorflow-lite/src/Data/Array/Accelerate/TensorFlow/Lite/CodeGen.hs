@@ -24,6 +24,7 @@ import Data.Array.Accelerate.TensorFlow.CodeGen                     ( buildOpenA
 import Data.Array.Accelerate.TensorFlow.CodeGen.AST
 import Data.Array.Accelerate.TensorFlow.CodeGen.Environment
 import Data.Array.Accelerate.TensorFlow.CodeGen.Tensor
+import qualified Data.Array.Accelerate.TensorFlow.CodeGen.Tensor.Shim as Sh
 import Data.Array.Accelerate.TensorFlow.TypeDicts
 
 import Data.Array.Accelerate.AST
@@ -43,6 +44,7 @@ import Control.Monad.State
 import Text.Printf
 import Data.Bifunctor                                               ( second )
 import qualified Data.Text                                          as T
+import Data.Typeable                                                ( Typeable )
 
 
 buildAfunWith :: Afun f -> Args f -> (Tfun f, ArgsNames f)
@@ -65,20 +67,21 @@ buildOpenAfunWith aenv (Alam lhs f) (Aparam xR x xs)
 
               shape :: ShapeR sh -> sh -> TensorShape sh
               shape ShapeRz         ()     = ()
-              shape (ShapeRsnoc tR) (t, h) = (shape tR t, TF.constant (TF.Shape []) [fromIntegral h])
+              shape (ShapeRsnoc tR) (t, h) = (shape tR t, Sh.wrap1 "scalar" TF.scalar (fromIntegral h))
 
               array :: TypeR t -> State Int (TensorArrayData t, TupR ArgName t)
               array TupRunit         = return ((), TupRunit)
               array (TupRpair aR bR) = (\(d1,n1) (d2,n2) -> ((d1,d2), TupRpair n1 n2)) <$> array aR <*> array bR
               array (TupRsingle aR)  = buildTypeDictsScalar aR (second (TupRsingle . ArgName) <$> placeholder)
                 where
-                  placeholder :: TF.TensorType t => State Int (TF.Tensor TF.Build t, T.Text)
+                  placeholder :: (Typeable t, Show t, TF.TensorType t) => State Int (Sh.Tensor t, T.Text)
                   placeholder = state $ \j ->
                     let name    = T.pack (printf "input%d_adata%d" i j)
                         opName  = TF.opName .~ TF.explicitName name
                         opShape = TF.opAttr "shape" .~ tensorShape _shR _sh
+                        node_ph = Sh.wrap1 "placeholder'" (\_ -> TF.placeholder' (opName . opShape)) (T.unpack name)
                     in
-                    ((TF.placeholder' (opName . opShape), name), j+1)
+                    ((node_ph, name), j+1)
           in
           ((env `Apush` Tensor arrR sh' adata', TupRsingle (ArrArgNames names)), i+1)
   in do
@@ -99,10 +102,11 @@ buildOpenAfunWith aenv (Abody f) (Aresult _ rsh)
               shape :: ShapeR sh -> TensorShape sh -> State Int (TensorShape sh)
               shape ShapeRz         ()     = return ()
               shape (ShapeRsnoc tR) (t, h) = do
-                h' <- state $ \j -> let opName  = TF.opName .~ TF.explicitName (T.pack (printf "output%d_shape%d" i j))
+                h' <- state $ \j -> let name = printf "output%d_shape%d" i j
+                                        opName  = TF.opName .~ TF.explicitName (T.pack name)
                                         opShape = TF.opAttr "shape" .~ TF.Shape []
                                     in
-                                    (TF.identity' (opShape . opName) h, j+1)
+                                    (Sh.wrap1 "identity'" (\_ -> TF.identity' (opShape . opName)) name h, j+1)
                 t' <- shape tR t
                 return (t', h')
 
@@ -111,12 +115,13 @@ buildOpenAfunWith aenv (Abody f) (Aresult _ rsh)
               array (TupRpair aR bR) (a, b) = (,) <$> array aR a <*> array bR b
               array (TupRsingle aR)  a      = buildTypeDictsScalar aR label a
 
-              label :: TF.TensorType t => TF.Tensor TF.Build t -> State Int (TF.Tensor TF.Build t)
+              label :: (TF.TensorType t, Typeable t, Show t) => Sh.Tensor t -> State Int (Sh.Tensor t)
               label t = state $ \j ->
-                let opName  = TF.opName .~ TF.explicitName (T.pack (printf "output%d_adata%d" i j))
+                let name = printf "output%d_adata%d" i j
+                    opName  = TF.opName .~ TF.explicitName (T.pack name)
                     opShape = TF.opAttr "shape" .~ tensorShape _shR sh
                 in
-                (TF.identity' (opShape . opName) t, j+1)
+                (Sh.wrap1 "identity'" (\_ -> TF.identity' (opShape . opName)) name t, j+1)
           in
           (Tensor (ArrayR _shR _eR) sh' adata', i+1)
 

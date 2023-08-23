@@ -20,6 +20,7 @@ module Data.Array.Accelerate.TensorFlow.CodeGen.Tensor
   where
 
 import Data.Array.Accelerate.TensorFlow.CodeGen.Base
+import qualified Data.Array.Accelerate.TensorFlow.CodeGen.Tensor.Shim as Sh
 
 import Data.Array.Accelerate.Array.Data
 import Data.Array.Accelerate.Array.Unique
@@ -56,10 +57,10 @@ data Tensor sh e where
          -> TensorArrayData e
          -> Tensor sh e
 
-type TensorShape sh    = TArrayDataR (TF.Tensor TF.Build) sh
-type TensorArrayData e = TArrayDataR (TF.Tensor TF.Build) e
+type TensorShape sh    = TArrayDataR Sh.Tensor sh
+type TensorArrayData e = TArrayDataR Sh.Tensor e
 
-type ScalarTensorArrayData e = TensorArrayData e ~ TF.Tensor TF.Build e
+type ScalarTensorArrayData e = TensorArrayData e ~ Sh.Tensor e
 
 type family TArrayDataR ba a where
   TArrayDataR ba ()     = ()
@@ -96,7 +97,7 @@ instance TF.Nodes (Tensor sh e) where
     where
       shapeNodes :: ShapeR sh -> TensorShape sh -> TF.Build (Set TF.NodeName)
       shapeNodes ShapeRz          ()       = return Set.empty
-      shapeNodes (ShapeRsnoc shR) (sh, sz) = TF.nodesUnion [ shapeNodes shR sh, TF.getNodes sz ]
+      shapeNodes (ShapeRsnoc shR) (sh, sz) = TF.nodesUnion [ shapeNodes shR sh, TF.getNodes (Sh.unwrap sz) ]
 
       arrayNodes :: TypeR t -> TensorArrayData t -> TF.Build (Set TF.NodeName)
       arrayNodes TupRunit ()             = return Set.empty
@@ -115,20 +116,20 @@ instance TF.Nodes (Tensor sh e) where
           num (FloatingNumType t) = floating t
 
           integral :: IntegralType t -> TensorArrayData t -> TF.Build (Set TF.NodeName)
-          integral TypeInt8   = TF.getNodes
-          integral TypeInt16  = TF.getNodes
-          integral TypeInt32  = TF.getNodes
-          integral TypeInt64  = TF.getNodes
-          integral TypeWord8  = TF.getNodes
-          integral TypeWord16 = TF.getNodes
-          integral TypeWord32 = TF.getNodes
-          integral TypeWord64 = TF.getNodes
-          integral TypeInt    = TF.getNodes
-          integral TypeWord   = TF.getNodes
+          integral TypeInt8   = TF.getNodes . Sh.unwrap
+          integral TypeInt16  = TF.getNodes . Sh.unwrap
+          integral TypeInt32  = TF.getNodes . Sh.unwrap
+          integral TypeInt64  = TF.getNodes . Sh.unwrap
+          integral TypeWord8  = TF.getNodes . Sh.unwrap
+          integral TypeWord16 = TF.getNodes . Sh.unwrap
+          integral TypeWord32 = TF.getNodes . Sh.unwrap
+          integral TypeWord64 = TF.getNodes . Sh.unwrap
+          integral TypeInt    = TF.getNodes . Sh.unwrap
+          integral TypeWord   = TF.getNodes . Sh.unwrap
 
           floating :: FloatingType t -> TensorArrayData t -> TF.Build (Set TF.NodeName)
-          floating TypeFloat  = TF.getNodes
-          floating TypeDouble = TF.getNodes
+          floating TypeFloat  = TF.getNodes . Sh.unwrap
+          floating TypeDouble = TF.getNodes . Sh.unwrap
           floating TypeHalf   = unsupported "half-precision floating point"
 
 instance TF.Fetchable (Tensor sh e) (Array sh e) where
@@ -144,16 +145,16 @@ instance TF.Fetchable (Tensor sh e) (Array sh e) where
               tdata <- TF.fetchTensorVector tensor
               return $ fromIntegral . V.head . TF.decodeTensorData <$> tdata
         in
-        liftA2 (,) <$> fetchShape shR sh <*> fetch sz
+        liftA2 (,) <$> fetchShape shR sh <*> fetch (Sh.unwrap sz)
 
       fetchArray :: TypeR t -> TensorArrayData t -> TF.Build (TF.Fetch (ArrayData t))
       fetchArray TupRunit ()             = pure (pure ())
       fetchArray (TupRpair aR bR) (a, b) = liftA2 (,) <$> fetchArray aR a <*> fetchArray bR b
       fetchArray (TupRsingle aR) a       = scalar aR a
         where
-          wrap :: (Storable t, TF.TensorType s, ScalarTensorDataR t ~ s) => TF.Tensor TF.Build s -> TF.Build (TF.Fetch (UniqueArray t))
+          wrap :: (Storable t, TF.TensorType s, ScalarTensorDataR t ~ s) => Sh.Tensor s -> TF.Build (TF.Fetch (UniqueArray t))
           wrap tensor = do
-            tdata <- TF.fetchTensorVector tensor
+            tdata <- TF.fetchTensorVector (Sh.unwrap tensor)
             let vector  = TF.tensorDataBytes . TF.unTensorData <$> tdata
                 fp      = fst . V.unsafeToForeignPtr0 <$> vector
                 ua      = unsafePerformIO . newUniqueArray . castForeignPtr <$> fp

@@ -23,6 +23,7 @@ import qualified Data.Array.Accelerate.Debug.Internal               as Debug
 
 import Data.Array.Accelerate.TensorFlow.CodeGen.AST
 import Data.Array.Accelerate.TensorFlow.CodeGen.Tensor
+import qualified Data.Array.Accelerate.TensorFlow.CodeGen.Tensor.Shim as Sh
 import Data.Array.Accelerate.TensorFlow.TypeDicts
 
 import Data.Array.Accelerate.TensorFlow.Lite.ConverterPy
@@ -36,6 +37,7 @@ import qualified TensorFlow.Core                                    as TF
 
 import Control.DeepSeq
 import Control.Exception
+import Control.Monad.Writer.Strict
 import Data.ByteString                                              ( ByteString )
 import Data.Functor.Identity
 import qualified Data.Set                                           as Set
@@ -67,10 +69,13 @@ compileTfun f argsnames xs = withConverterPy $ \converter ->
 -- into a quantized tensorflow-lite model.
 compileTfunIn :: ConverterPy -> Tfun f -> ArgsNames f -> [Args f] -> IO ByteString
 compileTfunIn converter f argsnames xs = do
-  let graph = graph_of_model f
+  let (_shownGraphs, graph) = graph_of_model f
   let actualInputs =
         Set.fromList $ filter (T.isPrefixOf "input") $ map (view TF.name) (graph ^. TF.node)
-  --
+
+  -- putStrLn "Rendered graphs:"
+  -- forM_ _shownGraphs $ \s -> putStrLn $ "- " ++ s
+
   tflite <- runConverterJob converter graph (serialiseReprData argsnames actualInputs xs)
   model  <- edgetpu_compile tflite
   return model
@@ -113,25 +118,32 @@ edgetpu_compile tfliteBlob = withTemporaryDirectory "acctflite-compile" $ \tmpdi
   B.readFile edgetpu_file
 
 
-graph_of_model :: OpenTfun aenf t -> TF.GraphDef
+-- Returns the graph as well as a list of shown graphs, indicating what exactly TF has rendered.
+graph_of_model :: OpenTfun aenf t -> ([String], TF.GraphDef)
 graph_of_model (Tlam _ f)         = graph_of_model f
 graph_of_model (Tbody arrR model) =
   let
-      go :: TF.MonadBuild m => ArraysR a -> Tensors a -> m ()
+      go :: TF.MonadBuild m => ArraysR a -> Tensors a -> WriterT [String] m ()
       go TupRunit              ()                         = return ()
       go (TupRpair aR bR)      (a, b)                     = go aR a >> go bR b
       go (TupRsingle ArrayR{}) (Tensor (ArrayR _ aR) _ a) = array aR a
 
-      array :: TF.MonadBuild m => TypeR t -> TensorArrayData t -> m ()
+      array :: TF.MonadBuild m => TypeR t -> TensorArrayData t -> WriterT [String] m ()
       array TupRunit         ()     = return ()
       array (TupRpair aR bR) (a, b) = array aR a >> array bR b
-      array (TupRsingle aR)  a      = buildTypeDictsScalar aR render a
+      array (TupRsingle aR)  a      = buildTypeDictsScalar aR $ render a
 
-      render :: TF.MonadBuild m => TF.Tensor TF.Build a -> m ()
-      render t = TF.render t >> return ()
+      render :: TF.MonadBuild m => Sh.Tensor a -> WriterT [String] m ()
+      render t = do
+        tell [Sh.dotGraph (Sh.tensorGraph t)]
+        _ <- lift $ TF.render (Sh.unwrap t)
+        return ()
 
-      nodes = runIdentity $ TF.evalBuildT (go arrR model >> TF.flushNodeBuffer)
+      (nodes, graphStrings) =
+        runIdentity $ TF.evalBuildT $ runWriterT $ do
+          go arrR model
+          lift TF.flushNodeBuffer
       graph = defMessage & TF.node .~ nodes :: TF.GraphDef
   in
-  graph
+  (graphStrings, graph)
 
