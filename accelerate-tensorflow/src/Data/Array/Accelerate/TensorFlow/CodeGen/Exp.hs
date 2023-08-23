@@ -111,6 +111,7 @@ buildOpenExp contextR context env aenv =
     ToIndex shR sh ix             -> let
         go :: ShapeR sh -> TensorArrayData sh -> TensorArrayData sh -> TensorArrayData Int
         go ShapeRz _ _ = fillL (TupRsingle (scalarType @Int)) (Sh.wrap1 "scalar" TF.scalar 0)
+        go (ShapeRsnoc ShapeRz) ((),n) ((),i) = i
         go (ShapeRsnoc shr) (sh,n) (ix,i) = i + n * go shr sh ix
       in go shR (buildE sh) (buildE ix)
     FromIndex shR sh i            -> let
