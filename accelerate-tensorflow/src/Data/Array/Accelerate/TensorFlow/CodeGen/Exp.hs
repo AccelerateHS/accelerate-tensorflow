@@ -91,7 +91,7 @@ buildOpenExp contextR context env aenv =
             let n = shapeProd shr sh  -- 0D tensor containing full size of p
                 n1 = Sh.wrap "reshape" TF.reshape n (Sh.wrap2 "constant" TF.constant (TF.Shape [1]) [1 :: ScalarTensorDataR Int])
                 pflattened = Sh.wrap "reshape" TF.reshape p n1
-            in Sh.wrap "gather" TF.gather pflattened ix
+            in Sh.wrap "reshape" TF.reshape (Sh.wrap "gather" TF.gather pflattened ix) (shapeToTensor contextR context)
         TupRunit -> ()
         TupRpair tl tr -> let (pl, pr) = p in ( gatherL (Tensor (ArrayR shr tl) sh pl) ix
                                               , gatherL (Tensor (ArrayR shr tr) sh pr) ix)
