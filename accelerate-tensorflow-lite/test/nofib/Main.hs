@@ -29,7 +29,7 @@ main
   = withDeviceContext
   $ withConverterPy' converterSettings $ \converter ->
     defaultMain
-  $ localOption (HedgehogTestLimit (Just 5))
+  $ localOption (HedgehogTestLimit (Just 30))
   $ localOption (HedgehogShrinkLimit (Just 0))
   $ testGroup "nofib-tensorflow-lite"
       [ test_prelude converter
