@@ -3,13 +3,18 @@ BAZEL_BIN_DIR := extra-deps/tensorflow-haskell/third_party/tensorflow/bazel-bin
 TF_LIB_SO_BASE := $(BAZEL_BIN_DIR)/tensorflow/libtensorflow.so
 TF_LIB_LINKS := $(TF_LIB_SO_BASE) $(TF_LIB_SO_BASE).2 $(TF_LIB_SO_BASE).2.10
 
-.PHONY: all help setup submodules tflitebuild tf-lib-links libedgetpu libedgetpu-lib-links cabal.project
+# Prefix this to a command to make python available
+ENVPYPATH := env PATH="$(PWD)/python-3.10-prefix:$$PATH"
+
+.PHONY: all help setup python pydeps submodules tflitebuild tf-lib-links libedgetpu libedgetpu-lib-links cabal.project
 
 all: help
 
 help:
 	@echo "This Makefile defines the following targets:"
 	@echo "  'setup': all of the following:"
+	@echo "    'python': Downloads and compiles Python 3.10"
+	@echo "    'pydeps': Install Python dependencies locally"
 	@echo "    'submodules': Sets up the Git submodules"
 	@echo "    'tflitebuild': Builds tensorflow lite inside build/"
 	@echo "    'tfbuild': Builds full tensorflow with bazel"
@@ -21,12 +26,19 @@ help:
 
 # Don't list these targets as dependencies here so that things don't go _quite_ as horribly wrong when someone misguidedly uses -j with this Makefile
 setup:
+	$(MAKE) python
+	$(MAKE) pydeps
 	$(MAKE) submodules
 	$(MAKE) tflitebuild tfbuild
 	$(MAKE) tf-lib-links
 	$(MAKE) libedgetpu
 	$(MAKE) libedgetpu-lib-links
 	$(MAKE) cabal.project
+
+python: python-3.10-prefix/bin/python
+
+pydeps:
+	python-3.10-prefix/bin/pip3 install numpy virtualenv
 
 submodules:
 	@if git status --porcelain | grep extra-deps >/dev/null; then \
@@ -37,14 +49,14 @@ submodules:
 
 tflitebuild:
 	mkdir -p build
-	cd build && cmake ../extra-deps/tensorflow-haskell/third_party/tensorflow/tensorflow/lite -DBUILD_SHARED_LIBS=1
-	cd build && cmake --build . -j
+	cd build && $(ENVPYPATH) cmake ../extra-deps/tensorflow-haskell/third_party/tensorflow/tensorflow/lite -DBUILD_SHARED_LIBS=1
+	cd build && $(ENVPYPATH) cmake --build . -j
 
 tfbuild: bazel511
-	cd extra-deps/tensorflow-haskell/third_party/tensorflow && ../../../../bazel511 build //tensorflow:all //tensorflow/tools/pip_package:build_pip_package
-	cd extra-deps/tensorflow-haskell/third_party/tensorflow && ../../../../run-with-PATH-dir.sh python=python3 -- bazel-bin/tensorflow/tools/pip_package/build_pip_package ../../../../accelerate-tensorflow-lite/tf-python-venv
-	virtualenv accelerate-tensorflow-lite/tf-python-venv
-	accelerate-tensorflow-lite/tf-python-venv/bin/pip3 install --force-reinstall accelerate-tensorflow-lite/tf-python-venv/tensorflow-2.10.1-*.whl
+	cd extra-deps/tensorflow-haskell/third_party/tensorflow && $(ENVPYPATH) ../../../../bazel511 build //tensorflow:all //tensorflow/tools/pip_package:build_pip_package
+	cd extra-deps/tensorflow-haskell/third_party/tensorflow && $(ENVPYPATH) bazel-bin/tensorflow/tools/pip_package/build_pip_package ../../../../accelerate-tensorflow-lite/tf-python-venv
+	$(ENVPYPATH) virtualenv accelerate-tensorflow-lite/tf-python-venv
+	$(ENVPYPATH) accelerate-tensorflow-lite/tf-python-venv/bin/pip3 install --force-reinstall accelerate-tensorflow-lite/tf-python-venv/tensorflow-2.10.1-*.whl
 
 bazel511:
 	curl -L https://github.com/bazelbuild/bazel/releases/download/5.1.1/bazel-5.1.1-linux-x86_64 >$@
@@ -74,3 +86,6 @@ extra-deps/libedgetpu/out/throttled/k8/libedgetpu.so:
 
 cabal.project: cabal.project.in
 	envsubst '$$PWD' <$< >$@
+
+python-3.10-prefix/bin/python:
+	./build_python.sh
