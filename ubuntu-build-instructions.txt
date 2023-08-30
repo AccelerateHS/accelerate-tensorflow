@@ -1,0 +1,22 @@
+Install Ubuntu Server 22.04.3 (choose "minimized" during installation)
+    -- note that I'm using Ubuntu and not Debian because the latest Debian Stable is already on Python 3.11,
+    -- which TF 2.10.1 is incompatible with. It needs Python 3.10.
+$ sudo apt update
+$ sudo apt upgrade
+$ sudo apt install build-essential curl libffi-dev libffi7 libgmp-dev libgmp10 libncurses-dev libncurses5 libtinfo5 locales zlib1g-dev gawk git cmake libssl-dev libusb-1.0-0-dev protobuf-compiler
+$ mkdir -p .local/bin
+$ curl -L 'https://downloads.haskell.org/~ghcup/0.1.19.4/x86_64-linux-ghcup-0.1.19.4' >.local/bin/ghcup
+$ chmod +x .local/bin/ghcup
+$ echo 'export PATH="$HOME/.local/bin:$HOME/.ghcup/bin:$PATH"' >>.bashrc
+$ export PATH="$HOME/.local/bin:$HOME/.ghcup/bin:$PATH"
+$ ghcup install ghc 8.10.7
+$ ghcup install cabal
+$ sudo apt install pip        # python3 is of course also required -- in particular version 3.10, not 3.11 -- but this is already installed in the Ubuntu base image
+$ sudo apt install python-is-python3   # TF stupidly expects to be able to run 'python', so symlink /usr/bin/python to python3
+$ sudo pip install numpy virtualenv packaging
+$ git clone https://github.com/AccelerateHS/accelerate-tensorflow
+$ cd accelerate-tensorflow
+$ make setup                  # grab a coffee
+$ cabal update
+$ ./in-env.sh cabal build accelerate-tensorflow-lite
+$ ./in-env.sh cabal run nofib-tensorflow-lite
