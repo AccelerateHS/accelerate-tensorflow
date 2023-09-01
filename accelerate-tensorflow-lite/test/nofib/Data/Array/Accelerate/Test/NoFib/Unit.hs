@@ -21,8 +21,7 @@ module Data.Array.Accelerate.Test.NoFib.Unit (
 import Data.Array.Accelerate.Test.NoFib.Base
 
 import Data.Array.Accelerate                                        as A
-import Data.Array.Accelerate.Interpreter                            as I
-import Data.Array.Accelerate.TensorFlow.Lite                        as TPU
+import Data.Array.Accelerate.TensorFlow.Lite                        ( ConverterPy, Args(..) )
 
 -- import Data.Array.Accelerate.Sugar.Shape
 
@@ -55,7 +54,4 @@ prop_sum_generate_2 converter = property $ do
   xs2  <- forAll (array ForInput sh f32)
   let f a b = A.sum (A.generate (A.constant sh) (\i -> a ! i + b ! i))
   -- let f a b = A.sum (A.zipWith (+) a b)
-  let !ref = I.runN f
-      !tpu = TPU.compileWith converter f (P.zipWith (\a b -> a :-> b :-> Result sh') dat1 dat2)
-  --
-  TPU.execute tpu xs1 xs2 ~~~ ref xs1 xs2
+  tpuTestCase converter f (P.zipWith (\a b -> a :-> b :-> Result sh') dat1 dat2) xs1 xs2
