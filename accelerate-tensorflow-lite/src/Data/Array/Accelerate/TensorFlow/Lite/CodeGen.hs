@@ -1,6 +1,7 @@
 {-# LANGUAGE GADTs             #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes        #-}
+{-# LANGUAGE TypeApplications  #-}
 -- |
 -- Module      : Data.Array.Accelerate.TensorFlow.Lite.CodeGen
 -- Copyright   : [2021..2022] The Accelerate Team
@@ -43,6 +44,7 @@ import qualified TensorFlow.Ops                                     as TF hiding
 import Control.Monad.State
 import Text.Printf
 import Data.Bifunctor                                               ( second )
+import Data.Int                                                     ( Int64 )
 import qualified Data.Text                                          as T
 import Data.Typeable                                                ( Typeable )
 
@@ -78,10 +80,16 @@ buildOpenAfunWith aenv (Alam lhs f) (Aparam xR x xs)
                   placeholder = state $ \j ->
                     let name    = T.pack (printf "input%d_adata%d" i j)
                         opName  = TF.opName .~ TF.explicitName name
-                        opShape = TF.opAttr "shape" .~ tensorShape _shR _sh
-                        node_ph = Sh.wrap1 "placeholder'" (\_ -> TF.placeholder' (opName . opShape)) (T.unpack name)
+                        -- Declare the input as having the flattened shape. Then, within the model,
+                        -- reshape the input to the expected multidimensional shape.
+                        -- We do this dance because support for non-vector input shapes seems flaky.
+                        opShape = TF.opAttr "shape" .~ TF.Shape [fromIntegral @Int @Int64 (size _shR _sh)]
                     in
-                    ((node_ph, name), j+1)
+                    ((Sh.wrap "reshape" TF.reshape
+                          (Sh.wrap1 "placeholder'" (\_ -> TF.placeholder' (opName . opShape)) (T.unpack name))
+                          (tensorShapeTensor _shR _sh)
+                     ,name)
+                    ,j+1)
           in
           ((env `Apush` Tensor arrR sh' adata', TupRsingle (ArrArgNames names)), i+1)
   in do
@@ -119,9 +127,16 @@ buildOpenAfunWith aenv (Abody f) (Aresult _ rsh)
               label t = state $ \j ->
                 let name = printf "output%d_adata%d" i j
                     opName  = TF.opName .~ TF.explicitName (T.pack name)
-                    opShape = TF.opAttr "shape" .~ tensorShape _shR sh
+                    flatshR = ShapeRsnoc ShapeRz
+                    flatsh = ((), size _shR sh)
+                    -- Declare the output as having the flattened shape, and flatten the output
+                    -- value in the model (using 'reshape') before returning it.
+                    -- We do this dance because support for non-vector output shapes seems flaky.
+                    opShape = TF.opAttr "shape" .~ tensorShape flatshR flatsh
                 in
-                (Sh.wrap1 "identity'" (\_ -> TF.identity' (opShape . opName)) name t, j+1)
+                (Sh.wrap1 "identity'" (\_ -> TF.identity' (opShape . opName)) name
+                    (Sh.wrap "reshape" TF.reshape t (tensorShapeTensor flatshR flatsh))
+                , j+1)
           in
           (Tensor (ArrayR _shR _eR) sh' adata', i+1)
 
@@ -137,9 +152,12 @@ mapTupR f (TupRpair a b) = TupRpair (mapTupR f a) (mapTupR f b)
 mapTupR f (TupRsingle x) = TupRsingle (f x)
 mapTupR _ TupRunit = TupRunit
 
-tensorShape
-    :: ShapeR sh
-    -> sh
-    -> TF.Shape
-tensorShape shR     sh = TF.Shape [ fromIntegral x | x <- reverse (shapeToList shR sh) ]
+-- A TF.Shape corresponding to the given shape
+tensorShape :: ShapeR sh -> sh -> TF.Shape
+tensorShape shR sh = TF.Shape [ fromIntegral x | x <- reverse (shapeToList shR sh) ]
 
+-- A constant 1D tensor describing the given shape
+tensorShapeTensor :: ShapeR sh -> sh -> Sh.Tensor Int64
+tensorShapeTensor shR sh =
+  let TF.Shape l = tensorShape shR sh
+  in Sh.wrap2 "constant" TF.constant (TF.Shape [fromIntegral @Int @Int64 (length l)]) l
