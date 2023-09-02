@@ -21,7 +21,6 @@ module Data.Array.Accelerate.Test.NoFib.Prelude.Map (
 import Data.Array.Accelerate.Test.NoFib.Base
 
 import Data.Array.Accelerate                                        as A
-import Data.Array.Accelerate.Interpreter                            as I
 import Data.Array.Accelerate.TensorFlow.Lite                        as TPU
 
 import Data.Array.Accelerate.Sugar.Shape
@@ -36,8 +35,8 @@ import Test.Tasty.Hedgehog
 import Prelude                                                      as P
 
 
-test_map :: ConverterPy -> TestTree
-test_map converter =
+test_map :: TestContext -> TestTree
+test_map tc =
   testGroup "map"
     [ testDim dim0
     , testDim dim1
@@ -49,30 +48,27 @@ test_map converter =
               -> TestTree
       testDim dim =
         testGroup ("DIM" P.++ show (rank @sh))
-          [ testProperty "plus1" $ prop_map converter (+1) dim i64
-          , testProperty "neg"   $ prop_map converter negate dim f32
-          , testProperty "sin"   $ prop_map converter sin dim f32
-          , testProperty "cos"   $ prop_map converter cos dim f32
-          , testProperty "sqrt"  $ prop_map converter sqrt dim (fmap abs . f32)
+          [ testProperty "plus1" $ prop_map tc (+1) dim i64
+          , testProperty "neg"   $ prop_map tc negate dim f32
+          , testProperty "sin"   $ prop_map tc sin dim f32
+          , testProperty "cos"   $ prop_map tc cos dim f32
+          , testProperty "sqrt"  $ prop_map tc sqrt dim (fmap abs . f32)
           ]
 
 
 prop_map
     :: (P.Eq sh, Show sh, Shape sh, Elt e, Show e, Similar e)
-    => ConverterPy
+    => TestContext
     -> (Exp e -> Exp e)
     -> Gen sh
     -> (WhichData -> Gen e)
     -> Property
-prop_map converter f dim e =
+prop_map tc f dim e =
   property $ do
     sh  <- forAll dim
     dat <- forAll (generate_sample_data sh e)
     xs  <- forAll (array ForInput sh e)
-    let !ref = I.runN (A.map f)
-        !tpu = TPU.compileWith converter (A.map f) dat
-    --
-    TPU.execute tpu xs ~~~ ref xs
+    tpuTestCase tc (A.map f) dat xs
 
 generate_sample_data
   :: (Shape sh, Elt e)

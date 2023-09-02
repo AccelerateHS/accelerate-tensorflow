@@ -11,6 +11,7 @@
 module Data.Array.Accelerate.Test.NoFib.Prelude
   where
 
+import Data.Array.Accelerate.Test.NoFib.Base
 import Data.Array.Accelerate.Test.NoFib.Prelude.Backpermute
 import Data.Array.Accelerate.Test.NoFib.Prelude.Fold
 import Data.Array.Accelerate.Test.NoFib.Prelude.Generate
@@ -18,19 +19,17 @@ import Data.Array.Accelerate.Test.NoFib.Prelude.Map
 import Data.Array.Accelerate.Test.NoFib.Prelude.ZipWith
 import Data.Array.Accelerate.Test.NoFib.Prelude.Foreign
 
-import Data.Array.Accelerate.TensorFlow.Lite (ConverterPy)
-
 import Test.Tasty
 
 
-test_prelude :: ConverterPy -> TestTree
-test_prelude converter =
+test_prelude :: TestContext -> TestTree
+test_prelude tc =
   testGroup "prelude"
-    [ test_map converter
-    , test_zipWith converter
-    , test_fold converter
-    , test_backpermute converter
-    , test_generate converter
-    , test_foreign converter
+    [ test_map tc
+    , test_zipWith tc
+    , test_fold tc
+    , test_backpermute tc
+    , test_generate tc
+    , test_foreign tc
     ]
 

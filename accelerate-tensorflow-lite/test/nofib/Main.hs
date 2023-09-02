@@ -13,6 +13,7 @@ module Main (main) where
 import Test.Tasty
 import Test.Tasty.Hedgehog
 
+import Data.Array.Accelerate.Test.NoFib.Base
 import Data.Array.Accelerate.Test.NoFib.Prelude
 import Data.Array.Accelerate.Test.NoFib.Imaginary
 import Data.Array.Accelerate.Test.NoFib.Misc
@@ -29,12 +30,19 @@ main
   = withDeviceContext
   $ withConverterPy' converterSettings $ \converter ->
     defaultMain
-  $ localOption (HedgehogTestLimit (Just 30))
   $ localOption (HedgehogShrinkLimit (Just 0))
   $ testGroup "nofib-tensorflow-lite"
-      [ test_prelude converter
-      , test_imaginary converter
-      , test_misc converter
-      , test_unit converter
+      [ localOption (HedgehogTestLimit (Just 30)) $
+          testGroup "tpu" (tests converter TB_TPU)
+      , localOption (HedgehogTestLimit (Just 150)) $
+          testGroup "tfnative" (tests converter TB_TFNative)
       ]
-
+  where
+    tests converter tb =
+      let tc = TestContext { testCtxConverter = converter
+                           , testCtxBackend = tb }
+      in [ test_prelude tc
+         , test_imaginary tc
+         , test_misc tc
+         , test_unit tc
+         ]

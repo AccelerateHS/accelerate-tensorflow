@@ -21,7 +21,6 @@ module Data.Array.Accelerate.Test.NoFib.Imaginary.SASUM (
 import Data.Array.Accelerate.Test.NoFib.Base
 
 import Data.Array.Accelerate                                        as A
-import Data.Array.Accelerate.Interpreter                            as I
 import Data.Array.Accelerate.TensorFlow.Lite                        as TPU
 
 import Data.Array.Accelerate.Sugar.Elt
@@ -36,8 +35,8 @@ import Test.Tasty.Hedgehog
 import Prelude                                                      as P
 
 
-test_sasum :: ConverterPy -> TestTree
-test_sasum converter =
+test_sasum :: TestContext -> TestTree
+test_sasum tc =
   testGroup "sasum"
     [ testElt f32
     ]
@@ -46,24 +45,20 @@ test_sasum converter =
               => (WhichData -> Gen e)
               -> TestTree
       testElt e =
-        testProperty (show (eltR @e)) $ prop_sasum converter e
+        testProperty (show (eltR @e)) $ prop_sasum tc e
 
 prop_sasum
     :: (A.Num e, Show e, Similar e)
-    => ConverterPy
+    => TestContext
     -> (WhichData -> Gen e)
     -> Property
-prop_sasum converter e =
+prop_sasum tc e =
   property $ do
     sh  <- forAll dim1
     dat <- forAll (generate_sample_data_sasum sh e)
     xs  <- forAll (array ForInput sh e)
-    let
-        sasum = A.fold (+) 0 . A.map abs
-        !ref  = I.runN sasum
-        !tpu  = TPU.compileWith converter sasum dat
-    --
-    TPU.execute tpu xs ~~~ ref xs
+    let sasum = A.fold (+) 0 . A.map abs
+    tpuTestCase tc sasum dat xs
 
 generate_sample_data_sasum
   :: Elt e

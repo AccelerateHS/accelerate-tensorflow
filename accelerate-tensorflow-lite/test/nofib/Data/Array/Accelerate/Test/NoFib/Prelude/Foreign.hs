@@ -22,7 +22,6 @@ module Data.Array.Accelerate.Test.NoFib.Prelude.Foreign (
 import Data.Array.Accelerate.Test.NoFib.Base
 
 import Data.Array.Accelerate                                        as A
-import Data.Array.Accelerate.Interpreter                            as I
 import Data.Array.Accelerate.TensorFlow.Lite                        as TPU
 
 import Data.Array.Accelerate.Sugar.Shape
@@ -37,8 +36,8 @@ import Test.Tasty.Hedgehog
 import Prelude                                                      as P
 
 
-test_foreign :: ConverterPy -> TestTree
-test_foreign converter =
+test_foreign :: TestContext -> TestTree
+test_foreign tc =
   testGroup "foreign"
     [ testDim dim1
     , testDim dim2
@@ -50,43 +49,37 @@ test_foreign converter =
               -> TestTree
       testDim dim =
         testGroup ("DIM" P.++ show (rank @sh))
-          [ testProperty "argmin" $ prop_min converter dim f32
-          , testProperty "argmax" $ prop_max converter dim i16
+          [ testProperty "argmin" $ prop_min tc dim f32
+          , testProperty "argmax" $ prop_max tc dim i16
           ]
 
 prop_min
     :: (P.Eq sh, Show sh, Shape sh, Elt e, Show e, Similar e, A.Ord e)
-    => ConverterPy
+    => TestContext
     -> Gen (sh:.Int)
     -> (WhichData -> Gen e)
     -> Property
-prop_min converter dim e =
+prop_min tc dim e =
   property $ do
     sh  <- forAll dim
     dat <- forAll (generate_sample_data sh e)
     xs  <- forAll (array ForInput sh e)
     let !f   = argMin
-        !ref = I.runN f
-        !tpu = TPU.compileWith converter f dat
-    --
-    TPU.execute tpu xs ~~~ ref xs
+    tpuTestCase tc f dat xs
 
 prop_max
     :: (P.Eq sh, Show sh, Shape sh, Elt e, Show e, Similar e, A.Ord e)
-    => ConverterPy
+    => TestContext
     -> Gen (sh:.Int)
     -> (WhichData -> Gen e)
     -> Property
-prop_max converter dim e =
+prop_max tc dim e =
   property $ do
     sh  <- forAll dim
     dat <- forAll (generate_sample_data sh e)
     xs  <- forAll (array ForInput sh e)
     let !f   = argMax
-        !ref = I.runN f
-        !tpu = TPU.compileWith converter f dat
-    --
-    TPU.execute tpu xs ~~~ ref xs
+    tpuTestCase tc f dat xs
 
 
 generate_sample_data

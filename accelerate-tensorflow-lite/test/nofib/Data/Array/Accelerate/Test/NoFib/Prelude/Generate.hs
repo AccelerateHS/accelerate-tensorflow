@@ -21,7 +21,6 @@ module Data.Array.Accelerate.Test.NoFib.Prelude.Generate (
 import Data.Array.Accelerate.Test.NoFib.Base
 
 import Data.Array.Accelerate                                        as A
-import Data.Array.Accelerate.Interpreter                            as I
 import Data.Array.Accelerate.TensorFlow.Lite                        as TPU
 
 import Data.Array.Accelerate.Sugar.Shape
@@ -36,14 +35,14 @@ import Test.Tasty.Hedgehog
 import Prelude                                                      as P
 
 
-test_generate :: ConverterPy -> TestTree
-test_generate converter =
+test_generate :: TestContext -> TestTree
+test_generate tc =
   testGroup "generate"
     [ testDim dim0
     , testDim dim1
     , testDim dim2
-    , testProperty "fromintegral" $ prop_generate converter (\(I1 i) -> A.fromIntegral @Int @Int32 i) dim1
-    , testProperty "genid" $ prop_generate converter (\(I1 i) -> I1 i) dim1
+    , testProperty "fromintegral" $ prop_generate tc (\(I1 i) -> A.fromIntegral @Int @Int32 i) dim1
+    , testProperty "genid" $ prop_generate tc (\(I1 i) -> I1 i) dim1
     ]
     where
       testDim :: forall sh. (Shape sh, Show sh, P.Eq sh, Similar sh)
@@ -51,31 +50,28 @@ test_generate converter =
               -> TestTree
       testDim dim =
         testGroup ("DIM" P.++ show (rank @sh))
-          [ testProperty "fill32" $ prop_fill converter dim f32
-          , testProperty "fill16" $ prop_fill converter dim i16
-          , testProperty "fill8" $ prop_fill converter dim i8
-          , testProperty "mod19" $ prop_mod19 converter dim
-          , testProperty "noop_i32" $ prop_noop converter dim i32
-          , testProperty "noop_i64" $ prop_noop converter dim i64
-          , testProperty "noop_f32" $ prop_noop converter dim f32
+          [ testProperty "fill32" $ prop_fill tc dim f32
+          , testProperty "fill16" $ prop_fill tc dim i16
+          , testProperty "fill8" $ prop_fill tc dim i8
+          , testProperty "mod19" $ prop_mod19 tc dim
+          , testProperty "noop_i32" $ prop_noop tc dim i32
+          , testProperty "noop_i64" $ prop_noop tc dim i64
+          , testProperty "noop_f32" $ prop_noop tc dim f32
           ]
 
 prop_fill
     :: (P.Eq sh, Show sh, Shape sh, Elt e, Show e, Similar e, P.Num e)
-    => ConverterPy
+    => TestContext
     -> Gen sh
     -> (WhichData -> Gen e)
     -> Property
-prop_fill converter dim e =
+prop_fill tc dim e =
   property $ do
     sh  <- forAll dim
     x   <- forAll (e ForInput)
     dat <- forAllWith (const "sample-data") (generate_sample_data sh)
     let f    = A.fill (A.constant sh) (A.constant x)
-        !ref = I.runN f
-        !tpu = TPU.compileWith converter f dat
-    --
-    TPU.execute tpu ~~~ ref
+    tpuTestCase tc f dat
 
 
 
@@ -87,29 +83,26 @@ prop_fill converter dim e =
 -- prop_id = prop_generate id
 prop_generate
     :: forall sh e. (P.Eq sh, Show sh, Shape sh, Elt e, Similar e, Show e, P.Eq e)
-    => ConverterPy
+    => TestContext
     -> (Exp sh -> Exp e)
     -> Gen sh
     -> Property
-prop_generate converter g dim =
+prop_generate tc g dim =
   property $ do
     sh  <- forAll dim
     dat <- forAllWith (const "sample-data") (generate_sample_data sh)
     let f :: Acc (Array sh e)
-        f    = A.generate (A.constant sh) g
-        !ref = I.runN f
-        !tpu = TPU.compileWith converter f dat
-    --
-    TPU.execute tpu ~~~ ref
+        f = A.generate (A.constant sh) g
+    tpuTestCase tc f dat
 
 
 prop_noop
     :: forall sh e . (P.Eq sh, Show sh, Shape sh, Elt e, Similar e, Show e, P.Eq e)
-    => ConverterPy
+    => TestContext
     -> Gen sh
     -> (WhichData -> Gen e)
     -> Property
-prop_noop converter dim e =
+prop_noop tc dim e =
   property $ do
     sh  <- forAll dim
     dat <- forAll (do i  <- Gen.int (Range.linear 10 16)
@@ -119,43 +112,34 @@ prop_noop converter dim e =
 
     let f :: Acc (Array sh e) -> Acc (Array sh e)
         f xs = xs
-        !ref = I.runN f
-        !tpu = TPU.compileWith converter f dat
-    --
-    TPU.execute tpu inp ~~~ ref inp
+    tpuTestCase tc f dat inp
 
 
 prop_mod19
     :: forall sh. (P.Eq sh, Show sh, Shape sh)
-    => ConverterPy
+    => TestContext
     -> Gen sh
     -> Property
-prop_mod19 converter dim =
+prop_mod19 tc dim =
   property $ do
     sh  <- forAll dim
     dat <- forAllWith (const "sample-data") (generate_sample_data sh)
     let f    = A.generate (A.constant sh) (\ix -> A.toIndex (A.constant sh) ix `A.rem` A.constant 19)
-        !ref = I.runN f
-        !tpu = TPU.compileWith converter f dat
-    --
-    TPU.execute tpu ~~~ ref
+    tpuTestCase tc f dat
 
 
 -- prop_generate
 --     :: (P.Eq sh, Show sh, Shape sh, Elt e, Show e, Similar e)
---     => ConverterPy
+--     => TestContext
 --     -> (Exp sh -> Exp e)
 --     -> Gen sh
 --     -> Gen e
 --     -> Property
--- prop_generate converter f dim e =
+-- prop_generate tc f dim e =
 --   property $ do
 --     sh  <- forAll dim
 --     dat <- forAllWith (const "sample-data") (generate_sample_data sh e)
---     let !ref = I.runN (A.generate (A.constant sh) f)
---         !tpu = TPU.compileWith converter (A.generate (A.constant sh) f) dat
---     --
---     TPU.execute tpu ~~~ ref
+--     tpuTestCase tc (A.generate (A.constant sh) f) dat
 
 generate_sample_data
   :: (Shape sh, Elt e)

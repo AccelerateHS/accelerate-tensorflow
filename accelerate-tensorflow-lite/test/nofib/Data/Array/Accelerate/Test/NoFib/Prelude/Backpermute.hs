@@ -22,7 +22,6 @@ module Data.Array.Accelerate.Test.NoFib.Prelude.Backpermute (
 import Data.Array.Accelerate.Test.NoFib.Base
 
 import Data.Array.Accelerate                                        as A
-import Data.Array.Accelerate.Interpreter                            as I
 import Data.Array.Accelerate.TensorFlow.Lite                        as TPU
 
 import Hedgehog
@@ -35,8 +34,8 @@ import Test.Tasty.Hedgehog
 import Prelude                                                      as P
 
 
-test_backpermute :: ConverterPy -> TestTree
-test_backpermute converter =
+test_backpermute :: TestContext -> TestTree
+test_backpermute tc =
   testGroup "backpermute"
     [ testDIM2
     ]
@@ -44,23 +43,20 @@ test_backpermute converter =
       testDIM2 :: TestTree
       testDIM2 =
         testGroup "DIM2"
-          [ testProperty "transpose" $ prop_transpose converter f32
+          [ testProperty "transpose" $ prop_transpose tc f32
           ]
 
 prop_transpose
     :: (Elt e, Show e, Similar e)
-    => ConverterPy
+    => TestContext
     -> (WhichData -> Gen e)
     -> Property
-prop_transpose converter e =
+prop_transpose tc e =
   property $ do
     sh  <- forAll dim2
     dat <- forAllWith (const "sample-data") (generate_sample_data_transpose sh e)
     xs  <- forAll (array ForInput sh e)
-    let !ref = I.runN A.transpose
-        !tpu = TPU.compileWith converter A.transpose dat
-    --
-    TPU.execute tpu xs ~~~ ref xs
+    tpuTestCase tc A.transpose dat xs
 
 generate_sample_data_transpose
   :: Elt e

@@ -22,7 +22,6 @@ module Data.Array.Accelerate.Test.NoFib.Prelude.Fold (
 import Data.Array.Accelerate.Test.NoFib.Base
 
 import Data.Array.Accelerate                                        as A
-import Data.Array.Accelerate.Interpreter                            as I
 import Data.Array.Accelerate.TensorFlow.Lite                        as TPU
 
 import Data.Array.Accelerate.Sugar.Shape                            as S
@@ -37,8 +36,8 @@ import Test.Tasty.Hedgehog
 import Prelude                                                      as P
 
 
-test_fold :: ConverterPy -> TestTree
-test_fold converter =
+test_fold :: TestContext -> TestTree
+test_fold tc =
   testGroup "fold"
     [ testDim dim1'
     , testDim dim2'
@@ -50,48 +49,42 @@ test_fold converter =
               -> TestTree
       testDim dim =
         testGroup ("DIM" P.++ show (rank @(sh :. Int)))
-          [ testProperty "sum"     $ prop_fold converter (+) 0 dim f32
-          , testProperty "product" $ prop_fold1 converter (*) dim f32
-          , testProperty "minimum" $ prop_fold1 converter A.min dim f32
-          , testProperty "maximum" $ prop_fold1 converter A.max dim f32
+          [ testProperty "sum"     $ prop_fold tc (+) 0 dim f32
+          , testProperty "product" $ prop_fold1 tc (*) dim f32
+          , testProperty "minimum" $ prop_fold1 tc A.min dim f32
+          , testProperty "maximum" $ prop_fold1 tc A.max dim f32
           ]
 
 prop_fold
     :: (P.Eq sh, Show sh, Shape sh, A.Num e, Show e, Similar e)
-    => ConverterPy
+    => TestContext
     -> (Exp e -> Exp e -> Exp e)
     -> Exp e
     -> Gen (sh :. Int)
     -> (WhichData -> Gen e)
     -> Property
-prop_fold converter f z dim e =
+prop_fold tc f z dim e =
   property $ do
     sh  <- forAll dim
     dat <- forAll (generate_sample_data sh e)
     xs  <- forAll (array ForInput sh e)
     let acc  = A.fold f z
-        !ref = I.runN acc
-        !tpu = TPU.compileWith converter acc dat
-    --
-    TPU.execute tpu xs ~~~ ref xs
+    tpuTestCase tc acc dat xs
 
 prop_fold1
     :: (P.Eq sh, Show sh, Shape sh, A.Num e, Show e, Similar e)
-    => ConverterPy
+    => TestContext
     -> (Exp e -> Exp e -> Exp e)
     -> Gen (sh :. Int)
     -> (WhichData -> Gen e)
     -> Property
-prop_fold1 converter f dim e =
+prop_fold1 tc f dim e =
   property $ do
     sh  <- forAll (dim `except` \sh -> S.size sh P.== 0)
     dat <- forAll (generate_sample_data sh e)
     xs  <- forAll (array ForInput sh e)
     let acc  = A.fold1 f
-        !ref = I.runN acc
-        !tpu = TPU.compileWith converter acc dat
-    --
-    TPU.execute tpu xs ~~~ ref xs
+    tpuTestCase tc acc dat xs
 
 generate_sample_data
   :: (Shape sh, Elt e)

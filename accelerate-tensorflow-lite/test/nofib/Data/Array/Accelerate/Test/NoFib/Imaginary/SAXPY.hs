@@ -22,7 +22,6 @@ module Data.Array.Accelerate.Test.NoFib.Imaginary.SAXPY (
 import Data.Array.Accelerate.Test.NoFib.Base
 
 import Data.Array.Accelerate                                        as A
-import Data.Array.Accelerate.Interpreter                            as I
 import Data.Array.Accelerate.TensorFlow.Lite                        as TPU
 
 import Data.Array.Accelerate.Sugar.Elt
@@ -38,8 +37,8 @@ import Control.Monad
 import Prelude                                                      as P
 
 
-test_saxpy :: ConverterPy -> TestTree
-test_saxpy converter =
+test_saxpy :: TestContext -> TestTree
+test_saxpy tc =
   testGroup "saxpy"
     [ testElt f32
     ]
@@ -48,26 +47,22 @@ test_saxpy converter =
               => (WhichData -> Gen e)
               -> TestTree
       testElt e =
-        testProperty (show (eltR @e)) $ prop_saxpy converter e
+        testProperty (show (eltR @e)) $ prop_saxpy tc e
 
 prop_saxpy
     :: (P.Eq e, P.Num e, A.Num e, Show e, Similar e)
-    => ConverterPy
+    => TestContext
     -> (WhichData -> Gen e)
     -> Property
-prop_saxpy converter e =
+prop_saxpy tc e =
   property $ do
     sh  <- forAll dim1
     dat <- forAllWith (const "sample-data") (generate_sample_data_saxpy sh e)
     α   <- forAll (e ForInput)
     xs  <- forAll (array ForInput sh e)
     ys  <- forAll (array ForInput sh e)
-    let
-        saxpy = A.zipWith (\x y -> constant α * x + y)
-        !ref  = I.runN saxpy
-        !tpu  = TPU.compileWith converter saxpy dat
-    --
-    TPU.execute tpu xs ys ~~~ ref xs ys
+    let saxpy = A.zipWith (\x y -> constant α * x + y)
+    tpuTestCase tc saxpy dat xs ys
 
 generate_sample_data_saxpy
   :: Elt e

@@ -22,7 +22,6 @@ module Data.Array.Accelerate.Test.NoFib.Prelude.ZipWith (
 import Data.Array.Accelerate.Test.NoFib.Base
 
 import Data.Array.Accelerate                                        as A
-import Data.Array.Accelerate.Interpreter                            as I
 import Data.Array.Accelerate.TensorFlow.Lite                        as TPU
 
 import Data.Array.Accelerate.Sugar.Shape
@@ -37,8 +36,8 @@ import Test.Tasty.Hedgehog
 import Prelude                                                      as P
 
 
-test_zipWith :: ConverterPy -> TestTree
-test_zipWith converter =
+test_zipWith :: TestContext -> TestTree
+test_zipWith tc =
   testGroup "zipWith"
     [ testDim dim0
     , testDim dim1
@@ -50,31 +49,28 @@ test_zipWith converter =
               -> TestTree
       testDim dim =
         testGroup ("DIM" P.++ show (rank @sh))
-          [ testProperty "add" $ prop_zipWith converter (+) dim f32
-          , testProperty "sub" $ prop_zipWith converter (-) dim f32
-          , testProperty "mul" $ prop_zipWith converter (*) dim f32
-          , testProperty "min" $ prop_zipWith converter A.min dim f32
-          , testProperty "max" $ prop_zipWith converter A.max dim f32
+          [ testProperty "add" $ prop_zipWith tc (+) dim f32
+          , testProperty "sub" $ prop_zipWith tc (-) dim f32
+          , testProperty "mul" $ prop_zipWith tc (*) dim f32
+          , testProperty "min" $ prop_zipWith tc A.min dim f32
+          , testProperty "max" $ prop_zipWith tc A.max dim f32
           ]
 
 
 prop_zipWith
     :: (P.Eq sh, Show sh, Shape sh, Elt e, Show e, Similar e)
-    => ConverterPy
+    => TestContext
     -> (Exp e -> Exp e -> Exp e)
     -> Gen sh
     -> (WhichData -> Gen e)
     -> Property
-prop_zipWith converter f dim e =
+prop_zipWith tc f dim e =
   property $ do
     sh  <- forAll dim
     dat <- forAllWith (const "sample-data") (generate_sample_data sh e)
     xs  <- forAll (array ForInput sh e)
     ys  <- forAll (array ForInput sh e)
-    let !ref = I.runN (A.zipWith f)
-        !tpu = TPU.compileWith converter (A.zipWith f) dat
-    --
-    TPU.execute tpu xs ys ~~~ ref xs ys
+    tpuTestCase tc (A.zipWith f) dat xs ys
 
 generate_sample_data
   :: (Shape sh, Elt e)

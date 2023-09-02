@@ -18,7 +18,6 @@ module Data.Array.Accelerate.Test.NoFib.Misc
 import Data.Array.Accelerate.Test.NoFib.Base
 
 import Data.Array.Accelerate                                        as A
-import Data.Array.Accelerate.Interpreter                            as I
 import Data.Array.Accelerate.TensorFlow.Lite                        as TPU
 
 import Data.Array.Accelerate.Sugar.Shape
@@ -33,14 +32,14 @@ import Test.Tasty.Hedgehog
 import Prelude                                                      as P
 
 
-test_misc :: ConverterPy -> TestTree
-test_misc converter =
+test_misc :: TestContext -> TestTree
+test_misc tc =
   testGroup "misc"
-    [ test_arguments converter
+    [ test_arguments tc
     ]
 
-test_arguments :: ConverterPy -> TestTree
-test_arguments converter =
+test_arguments :: TestContext -> TestTree
+test_arguments tc =
   testGroup "arguments"
     [ testDim dim0
     , testDim dim1
@@ -52,16 +51,16 @@ test_arguments converter =
               -> TestTree
       testDim dim =
         testGroup ("DIM" P.++ show (rank @sh))
-          [ testProperty "missing" $ prop_missing_args converter dim f32
+          [ testProperty "missing" $ prop_missing_args tc dim f32
           ]
 
 prop_missing_args
     :: (P.Eq sh, Show sh, Shape sh, Elt e, Show e, Similar e, A.Num e)
-    => ConverterPy
+    => TestContext
     -> Gen sh
     -> (WhichData -> Gen e)
     -> Property
-prop_missing_args converter dim e =
+prop_missing_args tc dim e =
   property $ do
     sh   <- forAll dim
 
@@ -90,7 +89,4 @@ prop_missing_args converter dim e =
               let values = [x1, x2, x3, x4, x5, x6, x7]
               in P.sum $ P.zipWith (\b x -> if b then x else 0) mask values
 
-    let !ref = I.runN (A.zipWith4 f)
-        !tpu = TPU.compileWith converter (A.zipWith4 f) dat
-
-    TPU.execute tpu inp1 inp2 inp3 inp4 ~~~ ref inp1 inp2 inp3 inp4
+    tpuTestCase tc (A.zipWith4 f) dat inp1 inp2 inp3 inp4

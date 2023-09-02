@@ -170,6 +170,15 @@ absRelTol epsilonAbs epsilonRel u v
   | otherwise =
       abs (u - v) / max (epsilonAbs / epsilonRel) (max (abs u) (abs v)) < epsilonRel
 
+
+data TestContext = TestContext
+  { testCtxConverter :: ConverterPy
+  , testCtxBackend :: TestBackend }
+
+data TestBackend = TB_TPU | TB_TFNative
+  deriving (Show)
+
+
 -- | Given @Acc a -> Acc b -> Acc c@, return @c@
 type family TailAcc t where
   TailAcc (Acc a) = a
@@ -209,14 +218,21 @@ collectApplyFun _ = go (afunctionRepr @f)
       -- longrun :: a -> AfunctionR g
       -- shortapply :: AfunctionR g -> TailAcc g
 
-tpuTestCase' :: forall f m. (Afunction f, MonadTest m, Show (TailAcc f), Similar (TailAcc f)) => Proxy m -> ConverterPy -> f -> RepresentativeData (AfunctionR f) -> AfunctionR (ReplaceTailAcc (m ()) f)
-tpuTestCase' _ converter f dat = collectApplyFun @f @(m ()) Proxy $ \apply -> do
+tpuTestCase' :: forall f m. (Afunction f, MonadTest m, Show (TailAcc f), Similar (TailAcc f))
+             => Proxy m -> TestContext -> f
+             -> RepresentativeData (AfunctionR f) -> AfunctionR (ReplaceTailAcc (m ()) f)
+tpuTestCase' _ tc f dat = collectApplyFun @f @(m ()) Proxy $ \apply -> do
   let !ref = I.runN f
-      !tfref = TF.runN f
-      !tpu = TPU.compileWith converter f dat
 
-  apply (TPU.execute tpu) ~~~ apply ref
-  apply tfref ~~~ apply ref
+  case testCtxBackend tc of
+    TB_TPU ->
+      let !tpu = TPU.compileWith (testCtxConverter tc) f dat
+      in apply (TPU.execute tpu) ~~~ apply ref
+    TB_TFNative ->
+      let !tfref = TF.runN f
+      in apply tfref ~~~ apply ref
 
-tpuTestCase :: forall f. (Afunction f, Show (TailAcc f), Similar (TailAcc f)) => ConverterPy -> f -> RepresentativeData (AfunctionR f) -> AfunctionR (ReplaceTailAcc (PropertyT IO ()) f)
+tpuTestCase :: forall f. (Afunction f, Show (TailAcc f), Similar (TailAcc f))
+            => TestContext -> f
+            -> RepresentativeData (AfunctionR f) -> AfunctionR (ReplaceTailAcc (PropertyT IO ()) f)
 tpuTestCase = tpuTestCase' (Proxy @(PropertyT IO))

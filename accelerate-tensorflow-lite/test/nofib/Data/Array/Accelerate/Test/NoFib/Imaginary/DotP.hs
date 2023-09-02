@@ -23,7 +23,6 @@ import Data.Array.Accelerate.Smart                                  ( ($$) )
 import Data.Array.Accelerate.Test.NoFib.Base
 
 import Data.Array.Accelerate                                        as A
-import Data.Array.Accelerate.Interpreter                            as I
 import Data.Array.Accelerate.TensorFlow.Lite                        as TPU
 
 import Data.Array.Accelerate.Sugar.Elt
@@ -38,8 +37,8 @@ import Test.Tasty.Hedgehog
 import Prelude                                                      as P
 
 
-test_dotp :: ConverterPy -> TestTree
-test_dotp converter =
+test_dotp :: TestContext -> TestTree
+test_dotp tc =
   testGroup "dotp"
     [ testElt f32
     ]
@@ -48,25 +47,21 @@ test_dotp converter =
               => (WhichData -> Gen e)
               -> TestTree
       testElt e =
-        testProperty (show (eltR @e)) $ prop_dotp converter e
+        testProperty (show (eltR @e)) $ prop_dotp tc e
 
 prop_dotp
     :: (A.Num e, Show e, Similar e)
-    => ConverterPy
+    => TestContext
     -> (WhichData -> Gen e)
     -> Property
-prop_dotp converter e =
+prop_dotp tc e =
   property $ do
     sh  <- forAll dim1
     dat <- forAllWith (const "sample-data") (generate_sample_data_dotp sh e)
     xs  <- forAll (array ForInput sh e)
     ys  <- forAll (array ForInput sh e)
-    let
-        dotp = A.sum $$ A.zipWith (*)
-        !ref = I.runN dotp
-        !tpu = TPU.compileWith converter dotp dat
-    --
-    TPU.execute tpu xs ys ~~~ ref xs ys
+    let dotp = A.sum $$ A.zipWith (*)
+    tpuTestCase tc dotp dat xs ys
 
 generate_sample_data_dotp
   :: Elt e
