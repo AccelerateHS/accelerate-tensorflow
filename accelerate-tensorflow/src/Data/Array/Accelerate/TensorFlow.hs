@@ -2,6 +2,8 @@
 {-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GADTs               #-}
+{-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE PatternSynonyms     #-}
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -27,7 +29,8 @@ module Data.Array.Accelerate.TensorFlow (
 
 ) where
 
-import Data.Array.Accelerate                                        as A hiding ((++), reverse, fromIntegral)
+import Data.Array.Accelerate                                        ( Acc, Exp, Shape, Array, (:.)(..)
+                                                                    , pattern T2, pattern (::.) )
 import qualified Data.Array.Accelerate                              as A
 import Data.Array.Accelerate.AST                                    ( ALeftHandSide )
 import Data.Array.Accelerate.AST.LeftHandSide
@@ -37,7 +40,6 @@ import Data.Array.Accelerate.Lifetime
 import Data.Array.Accelerate.Representation.Type
 import Data.Array.Accelerate.Representation.Shape
 import Data.Array.Accelerate.Sugar.Array                            ( Arrays(..), ArraysR(..) )
-import Data.Array.Accelerate.Sugar.Elt
 import Data.Array.Accelerate.Trafo.Sharing
 import Data.Array.Accelerate.Trafo.Simplify
 import Data.Array.Accelerate.Type
@@ -47,19 +49,19 @@ import qualified Data.Array.Accelerate.Representation.Shape         as R
 import Data.Array.Accelerate.TensorFlow.CodeGen
 import Data.Array.Accelerate.TensorFlow.CodeGen.AST
 import Data.Array.Accelerate.TensorFlow.CodeGen.Tensor
+import qualified Data.Array.Accelerate.TensorFlow.CodeGen.Tensor.Shim as Sh
 import Data.Array.Accelerate.TensorFlow.TypeDicts
 import Data.Array.Accelerate.TensorFlow.CodeGen.Foreign
 
 import qualified TensorFlow.Core                                    as TF
-import qualified TensorFlow.GenOps.Core                             as TF
 import qualified TensorFlow.Tensor                                  as TF
 import qualified TensorFlow.Types                                   as TF
-import qualified TensorFlow.Ops                                     as TF
 import qualified TensorFlow.Internal.FFI                            as Internal
 
 import Control.Monad.State
 import Foreign.ForeignPtr
 import Foreign.Storable
+import System.Environment                                           ( lookupEnv )
 import System.IO.Unsafe
 import Text.Printf
 import qualified Data.Text                                          as T
@@ -72,9 +74,32 @@ run :: forall arrs. Arrays arrs => Acc arrs -> arrs
 run | FetchableDict <- fetchableDict @arrs
     = toArr
     . unsafePerformIO . TF.runSession . TF.run
+    . debugPrintTFGraph (arraysR @arrs)
     . buildAcc
     . simplifyAcc
     . convertAcc
+
+{-# NOINLINE debugPrintTFGraph #-}
+debugPrintTFGraph :: R.ArraysR a -> Tensors a -> Tensors a
+debugPrintTFGraph = \rep tenss -> unsafePerformIO $ do
+  lookupEnv "ACCELERATE_TF_PRINT_TFGRAPH" >>= \case
+    Just val | not (null val) -> do
+      let graphs = go rep tenss
+      putStrLn $ "Rendered TF graphs (" ++ show (length graphs) ++ "):"
+      forM_ graphs $ \s -> putStrLn $ "- " ++ s
+      return tenss
+    _ -> return tenss
+  where
+    go :: R.ArraysR a -> Tensors a -> [String]
+    go (TupRsingle (R.ArrayR shR eR)) (Tensor _ sht at) =
+      go2 (shapeType shR) sht ++ go2 eR at
+    go TupRunit () = []
+    go (TupRpair r1 r2) (x, y) = go r1 x ++ go r2 y
+
+    go2 :: TypeR a -> TArrayDataR Sh.Tensor a -> [String]
+    go2 (TupRsingle sR) tens = buildTypeDictsScalar sR $ [Sh.dotGraph (Sh.tensorGraph tens)]
+    go2 TupRunit () = []
+    go2 (TupRpair r1 r2) (x, y) = go2 r1 x ++ go2 r2 y
 
 -- | Prepare an embedded array program for execution on the default
 -- TensorFlow backend
@@ -87,8 +112,8 @@ runN acc =
              . convertAfun
              $ acc
 
-      eval :: AfunctionRepr g (AfunctionR g) (ArraysFunctionR g)
-           -> OpenTfun aenv (ArraysFunctionR g)
+      eval :: forall aenvtop g. AfunctionRepr g (AfunctionR g) (ArraysFunctionR g)
+           -> OpenTfun aenvtop (ArraysFunctionR g)
            -> Int
            -> [TF.Feed]
            -> AfunctionR g
@@ -97,7 +122,9 @@ runN acc =
         = toArr
         . unsafePerformIO
         . TF.runSession
-        $ TF.runWithFeeds aenv b
+        . TF.runWithFeeds aenv
+        . debugPrintTFGraph (arraysR @(AfunctionR g))
+        $ b
       eval (AfunctionReprLam lamR) (Tlam lhs f) skip aenv = \arr ->
         let
             go :: ALeftHandSide t aenv aenv' -> t -> [TF.Feed] -> State Int [TF.Feed]
@@ -166,11 +193,11 @@ argMinMax minMax xs = let ys = argMinMax' xs
                         in A.imap (\ix y -> T2 y (xs A.! (ix ::. (A.fromIntegral y)))) ys
   where
     argMinMax' :: (Shape sh, A.Ord a) => Acc (Array (sh :. Int) a) -> Acc (Array sh Int32)
-    argMinMax' = foreignAcc
+    argMinMax' = A.foreignAcc
       (ForeignAcc "argminmax" $ tpuArgMinMax minMax) --TPU
       (   A.map (\(T2 (_ ::. i) _) -> A.fromIntegral i) 
-        . fold1 (\(T2 a x) (T2 b y) -> A.ifThenElse (x `minOrMax` y) (T2 a x) (T2 b y))
-        . imap T2) -- fallback (interpreter/CPU/GPU)
+        . A.fold1 (\(T2 a x) (T2 b y) -> A.ifThenElse (x `minOrMax` y) (T2 a x) (T2 b y))
+        . A.imap T2) -- fallback (interpreter/CPU/GPU)
     minOrMax :: A.Ord a => Exp a -> Exp a -> Exp Bool
     minOrMax = case minMax of
       Min -> (A.<)

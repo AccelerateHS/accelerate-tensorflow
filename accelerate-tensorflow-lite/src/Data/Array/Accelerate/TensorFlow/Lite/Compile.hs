@@ -77,7 +77,7 @@ compileTfunIn converter f argsnames xs = do
 
   lookupEnv "ACCELERATE_TFLITE_PRINT_TFGRAPH" >>= \case
     Just val | not (null val) -> do
-      putStrLn "Rendered graphs:"
+      putStrLn $ "Rendered TFLite graphs (" ++ show (length shownGraphs) ++ "):"
       forM_ shownGraphs $ \s -> putStrLn $ "- " ++ s
     _ -> return ()
 
