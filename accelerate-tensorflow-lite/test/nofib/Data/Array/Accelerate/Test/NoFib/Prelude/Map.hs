@@ -50,6 +50,7 @@ test_map converter =
       testDim dim =
         testGroup ("DIM" P.++ show (rank @sh))
           [ testProperty "plus1" $ prop_map converter (+1) dim i64
+          , testProperty "neg"   $ prop_map converter negate dim f32
           , testProperty "sin"   $ prop_map converter sin dim f32
           , testProperty "cos"   $ prop_map converter cos dim f32
           , testProperty "sqrt"  $ prop_map converter sqrt dim (fmap abs . f32)
