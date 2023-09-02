@@ -140,7 +140,7 @@ runN acc =
                   shape (ShapeRsnoc shR) (t, h) = do
                     h' <- state $ \j ->
                            let tensorDataBytes = V.fromListN 1 [fromIntegral h :: ScalarTensorDataR Int]
-                               tensorDataShape = TF.Shape [1]
+                               tensorDataShape = TF.Shape []
                            in
                            (TF.feed (TF.tensorValueFromName (T.pack (printf "input%d_shape%d" i j))) (TF.encodeTensorData tensorDataShape tensorDataBytes), j+1)
                     t' <- shape shR t

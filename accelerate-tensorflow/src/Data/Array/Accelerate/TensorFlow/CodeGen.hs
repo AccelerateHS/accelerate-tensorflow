@@ -98,7 +98,7 @@ buildOpenAfun aenv (Alam lhs f) = do
               sz <- state $ \j ->
                       let name = printf "input%d_shape%d" i j
                           opName  = TF.opName .~ TF.explicitName (T.pack name)
-                          opShape = TF.opAttr "shape" .~ TF.Shape [1]
+                          opShape = TF.opAttr "shape" .~ TF.Shape []
                       in (Sh.wrap1 "placeholder'" (\_ -> TF.placeholder' (opShape . opName)) name, j+1)
               sh <- shape shR
               return (sh, sz)
