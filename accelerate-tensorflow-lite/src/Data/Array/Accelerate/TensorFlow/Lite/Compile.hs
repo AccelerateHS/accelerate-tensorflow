@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs             #-}
+{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 -- |
 -- Module      : Data.Array.Accelerate.TensorFlow.Lite.Compile
@@ -44,6 +45,7 @@ import qualified Data.Set                                           as Set
 import Data.ProtoLens
 import Formatting
 import Lens.Family2
+import System.Environment                                           ( lookupEnv )
 import System.Exit
 import System.FilePath
 import System.IO
@@ -69,12 +71,15 @@ compileTfun f argsnames xs = withConverterPy $ \converter ->
 -- into a quantized tensorflow-lite model.
 compileTfunIn :: ConverterPy -> Tfun f -> ArgsNames f -> [Args f] -> IO ByteString
 compileTfunIn converter f argsnames xs = do
-  let (_shownGraphs, graph) = graph_of_model f
+  let (shownGraphs, graph) = graph_of_model f
   let actualInputs =
         Set.fromList $ filter (T.isPrefixOf "input") $ map (view TF.name) (graph ^. TF.node)
 
-  -- putStrLn "Rendered graphs:"
-  -- forM_ _shownGraphs $ \s -> putStrLn $ "- " ++ s
+  lookupEnv "ACCELERATE_TFLITE_PRINT_TFGRAPH" >>= \case
+    Just val | not (null val) -> do
+      putStrLn "Rendered graphs:"
+      forM_ shownGraphs $ \s -> putStrLn $ "- " ++ s
+    _ -> return ()
 
   tflite <- runConverterJob converter graph (serialiseReprData argsnames actualInputs xs)
   model  <- edgetpu_compile tflite
