@@ -476,8 +476,8 @@ tpuArgMinMax minOrMax (Tensor (ArrayR (ShapeRsnoc shR) eR) (sh, _) t) =
                 ,Typeable t, Show t)
              => Sh.Tensor t -> Sh.Tensor output_type
       choose x = case minOrMax of
-                   Min -> Sh.wrap "argMin" TF.argMin x (Sh.wrap1 "scalar" (TF.scalar @Int32) 0)
-                   Max -> Sh.wrap "argMax" TF.argMax x (Sh.wrap1 "scalar" (TF.scalar @Int32) 0)
+                   Min -> Sh.wrap "argMin" TF.argMin x (Sh.wrap1 "scalar" (TF.scalar @Int32) (-1))
+                   Max -> Sh.wrap "argMax" TF.argMax x (Sh.wrap1 "scalar" (TF.scalar @Int32) (-1))
 
       integral :: IntegralType t -> TensorArrayData t -> TensorArrayData Int32
       integral TypeInt8   x = choose x
