@@ -1,5 +1,7 @@
 {-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE FlexibleInstances   #-}
+{-# LANGUAGE GADTs               #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE TypeOperators       #-}
@@ -44,7 +46,7 @@ test_foreign tc =
     , testDim dim3
     ]
     where
-      testDim :: forall sh. (Shape sh, Show sh, P.Eq sh)
+      testDim :: forall sh. (Shape2 sh, Show sh, P.Eq sh)
               => Gen (sh:.Int)
               -> TestTree
       testDim dim =
@@ -54,30 +56,30 @@ test_foreign tc =
           ]
 
 prop_min
-    :: (P.Eq sh, Show sh, Shape sh, Elt e, Show e, Similar e, A.Ord e)
+    :: (P.Eq sh, Show sh, Shape2 sh, Elt e, Show e, Similar e, A.Ord e, P.Ord e, P.Num e)
     => TestContext
     -> Gen (sh:.Int)
     -> (WhichData -> Gen e)
     -> Property
 prop_min tc dim e =
   property $ do
-    sh  <- forAll dim
+    sh  <- forAll (Gen.filter (\(_ :. n) -> n P.> 0) dim)
     dat <- forAll (generate_sample_data sh e)
-    xs  <- forAll (array ForInput sh e)
+    xs  <- forAll (Gen.filter (wellDefinedMax negate) $ array ForInput sh e)
     let !f   = argMin
     tpuTestCase tc f dat xs
 
 prop_max
-    :: (P.Eq sh, Show sh, Shape sh, Elt e, Show e, Similar e, A.Ord e)
+    :: (P.Eq sh, Show sh, Shape2 sh, Elt e, Show e, Similar e, A.Ord e, P.Ord e)
     => TestContext
     -> Gen (sh:.Int)
     -> (WhichData -> Gen e)
     -> Property
 prop_max tc dim e =
   property $ do
-    sh  <- forAll dim
+    sh  <- forAll (Gen.filter (\(_ :. n) -> n P.> 0) dim)
     dat <- forAll (generate_sample_data sh e)
-    xs  <- forAll (array ForInput sh e)
+    xs  <- forAll (Gen.filter (wellDefinedMax id) $ array ForInput sh e)
     let !f   = argMax
     tpuTestCase tc f dat xs
 
@@ -91,3 +93,19 @@ generate_sample_data (sh:.sz) e = do
   xs <- Gen.list (Range.linear 10 16) (array ForSample (sh:.sz) e)
   return [ x :-> Result sh | x <- xs ]
 
+-- The comparison is done after mapping the element function.
+wellDefinedMax :: (Shape2 sh, Elt e, P.Ord e') => (e -> e') -> Array (sh:.Int) e -> Bool
+wellDefinedMax conv arr =
+  let sh :. n = arrayShape arr
+      vectors = [[conv (arr `indexArray` (ix :. i)) | i <- [0 .. n - 1]] | ix <- enumerateShape sh]
+      wellDefinedMaxVector l = P.length (P.filter (P.>= P.maximum l) l) P.<= 1
+  in P.all wellDefinedMaxVector vectors
+
+-- Such metaprogramming is either very annoying or impossible with the
+-- Accelerate userland API, so we reimplement some stuff here.
+class Shape sh => Shape2 sh where
+  enumerateShape :: sh -> [sh]
+instance Shape2 Z where
+  enumerateShape Z = [Z]
+instance Shape2 sh => Shape2 (sh:.Int) where
+  enumerateShape (sh :. n) = [ix :. i | ix <- enumerateShape sh, i <- [0 .. n - 1]]
