@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE PatternSynonyms     #-}
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE RecordWildCards     #-}
@@ -53,14 +54,19 @@ import qualified Data.Array.Accelerate.TensorFlow.CodeGen.Tensor.Shim as Sh
 import Data.Array.Accelerate.TensorFlow.TypeDicts
 import Data.Array.Accelerate.TensorFlow.CodeGen.Foreign
 
+import qualified Proto.Tensorflow.Core.Framework.NodeDef_Fields     as TF
+import qualified TensorFlow.Build                                   as TF
 import qualified TensorFlow.Core                                    as TF
 import qualified TensorFlow.Tensor                                  as TF
 import qualified TensorFlow.Types                                   as TF
 import qualified TensorFlow.Internal.FFI                            as Internal
 
 import Control.Monad.State
+import Data.Functor.Identity
+import qualified Data.Set                                           as Set
 import Foreign.ForeignPtr
 import Foreign.Storable
+import Lens.Family2 (view)
 import System.Environment                                           ( lookupEnv )
 import System.IO.Unsafe
 import Text.Printf
@@ -112,6 +118,9 @@ runN acc =
              . convertAfun
              $ acc
 
+      nodeNames = modelNodeNames model
+      actualInputs = Set.fromList $ filter ("input" `T.isPrefixOf`) nodeNames
+
       eval :: forall aenvtop g. AfunctionRepr g (AfunctionR g) (ArraysFunctionR g)
            -> OpenTfun aenvtop (ArraysFunctionR g)
            -> Int
@@ -138,30 +147,44 @@ runN acc =
                   shape :: ShapeR sh -> sh -> State Int [TF.Feed]
                   shape ShapeRz          ()     = return []
                   shape (ShapeRsnoc shR) (t, h) = do
-                    h' <- state $ \j ->
-                           let tensorDataBytes = V.fromListN 1 [fromIntegral h :: ScalarTensorDataR Int]
-                               tensorDataShape = TF.Shape []
-                           in
-                           (TF.feed (TF.tensorValueFromName (T.pack (printf "input%d_shape%d" i j))) (TF.encodeTensorData tensorDataShape tensorDataBytes), j+1)
+                    j <- get
+                    modify (+1)
+
                     t' <- shape shR t
-                    return (h' : t')
+
+                    let name = T.pack (printf "input%d_shape%d" i j)
+                    return $
+                      if name `Set.member` actualInputs
+                        then let tensorDataBytes = V.fromListN 1 [fromIntegral h :: ScalarTensorDataR Int]
+                                 tensorDataShape = TF.Shape []
+                             in TF.feed (TF.tensorValueFromName name)
+                                        (TF.encodeTensorData tensorDataShape tensorDataBytes)
+                                : t'
+                        else t'
 
                   array :: TypeR t -> ArrayData t -> State Int [TF.Feed]
                   array TupRunit         ()     = return []
-                  array (TupRsingle aR)  a      = return <$> buildTypeDictsScalar aR feed a
+                  array (TupRsingle aR)  a      = buildTypeDictsScalar aR feed a
                   array (TupRpair aR bR) (a, b) = do
                     a' <- array aR a
                     b' <- array bR b
                     return (a' ++ b')
 
-                  feed :: forall t s. (Storable t, TF.TensorType s, s ~ ScalarTensorDataR t) => UniqueArray t -> State Int TF.Feed
-                  feed ua = state $ \j ->
-                    let fp                   = unsafeGetValue (uniqueArrayData ua)
-                        tensorDataBytes      = V.unsafeFromForeignPtr0 (castForeignPtr fp :: ForeignPtr Word8) (R.size _shR _sh * sizeOf (undefined :: t))
-                        tensorDataType       = TF.tensorType (undefined :: s)
-                        tensorDataDimensions = [ fromIntegral x :: ScalarTensorDataR Int | x <- reverse (R.shapeToList _shR _sh) ]
-                    in
-                    (TF.feed (TF.tensorValueFromName (T.pack (printf "input%d_adata%d" i j))) (TF.TensorData (Internal.TensorData {..})), j+1)
+                  feed :: forall t s. (Storable t, TF.TensorType s, s ~ ScalarTensorDataR t) => UniqueArray t -> State Int [TF.Feed]
+                  feed ua = do
+                    j <- get
+                    modify (+1)
+
+                    let name = T.pack (printf "input%d_adata%d" i j)
+                    return $
+                      if name `Set.member` actualInputs
+                        then let fp                   = unsafeGetValue (uniqueArrayData ua)
+                                 tensorDataBytes      = V.unsafeFromForeignPtr0 (castForeignPtr fp :: ForeignPtr Word8) (R.size _shR _sh * sizeOf (undefined :: t))
+                                 tensorDataType       = TF.tensorType (undefined :: s)
+                                 tensorDataDimensions = [ fromIntegral x :: ScalarTensorDataR Int | x <- reverse (R.shapeToList _shR _sh) ]
+                             in [TF.feed (TF.tensorValueFromName name)
+                                         (TF.TensorData (Internal.TensorData {..}))]
+                        else []
               in
               (sh' ++ adata' ++ env, i+1)
 
@@ -171,6 +194,24 @@ runN acc =
       eval _ _ _ _ = error "impossible"
   in
   eval (afunctionRepr @f) model 0 []
+
+modelNodeNames :: OpenTfun aenv t -> [T.Text]
+modelNodeNames (Tlam _ f)         = modelNodeNames f
+modelNodeNames (Tbody arrR model) =
+  let
+      go :: TF.MonadBuild m => R.ArraysR a -> Tensors a -> m ()
+      go TupRunit                ()                               = return ()
+      go (TupRpair aR bR)        (a, b)                           = go aR a >> go bR b
+      go (TupRsingle R.ArrayR{}) (Tensor (R.ArrayR shR aR) sht t) = array (shapeType shR) sht >> array aR t
+
+      array :: TF.MonadBuild m => TypeR t -> TensorArrayData t -> m ()
+      array TupRunit         ()     = return ()
+      array (TupRpair aR bR) (a, b) = array aR a >> array bR b
+      array (TupRsingle aR)  a      = buildTypeDictsScalar aR $
+                                        TF.render (Sh.unwrap a) >> return ()
+  in runIdentity $ TF.evalBuildT $ do
+       go arrR model
+       map (view TF.name) <$> TF.flushNodeBuffer
 
 
 data FetchableDict t where
