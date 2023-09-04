@@ -73,7 +73,7 @@ compileTfunIn :: ConverterPy -> Tfun f -> ArgsNames f -> [Args f] -> IO ByteStri
 compileTfunIn converter f argsnames xs = do
   let (shownGraphs, graph) = graph_of_model f
   let actualInputs =
-        Set.fromList $ filter (T.isPrefixOf "input") $ map (view TF.name) (graph ^. TF.node)
+        Set.fromList $ filter ("input" `T.isPrefixOf`) $ map (view TF.name) (graph ^. TF.node)
 
   lookupEnv "ACCELERATE_TFLITE_PRINT_TFGRAPH" >>= \case
     Just val | not (null val) -> do
@@ -124,7 +124,7 @@ edgetpu_compile tfliteBlob = withTemporaryDirectory "acctflite-compile" $ \tmpdi
 
 
 -- Returns the graph as well as a list of shown graphs, indicating what exactly TF has rendered.
-graph_of_model :: OpenTfun aenf t -> ([String], TF.GraphDef)
+graph_of_model :: OpenTfun aenv t -> ([String], TF.GraphDef)
 graph_of_model (Tlam _ f)         = graph_of_model f
 graph_of_model (Tbody arrR model) =
   let
