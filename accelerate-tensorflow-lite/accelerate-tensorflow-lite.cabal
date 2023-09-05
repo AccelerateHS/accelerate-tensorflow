@@ -7,10 +7,10 @@ cabal-version: 2.2
 name:           accelerate-tensorflow-lite
 version:        0.1.0.0
 synopsis:       Accelerate backend component generating TensorFlow graphs
-description:    Please see the README on GitHub at <https://github.com/tmcdonell/accelerate-tensorflow#readme>
+description:    Please see the README on GitHub at <https://github.com/AccelerateHS/accelerate-tensorflow#readme>
 category:       Accelerate, Concurrency, Data, Parallelism
-homepage:       https://github.com/tmcdonell/accelerate-tensorflow#readme
-bug-reports:    https://github.com/tmcdonell/accelerate-tensorflow/issues
+homepage:       https://github.com/AccelerateHS/accelerate-tensorflow#readme
+bug-reports:    https://github.com/AccelerateHS/accelerate-tensorflow/issues
 author:         Trevor L. McDonell
 maintainer:     Trevor L. McDonell <trevor.mcdonell@gmail.com>
 copyright:      [2021..2022] The Accelerate Team
@@ -28,7 +28,7 @@ data-files:
 
 source-repository head
   type: git
-  location: https://github.com/tmcdonell/accelerate-tensorflow
+  location: https://github.com/AccelerateHS/accelerate-tensorflow
 
 library
   exposed-modules:
