@@ -6,19 +6,79 @@
 {-# LANGUAGE RecordWildCards          #-}
 {-# LANGUAGE ScopedTypeVariables      #-}
 {-# LANGUAGE TypeApplications         #-}
--- |
--- Module      : Data.Array.Accelerate.TensorFlow.Lite
--- Copyright   : [2021..2022] The Accelerate Team
--- License     : BSD3
---
--- Maintainer  : Trevor L. McDonell <trevor.mcdonell@gmail.com>
--- Stability   : experimental
--- Portability : non-portable (GHC extensions)
---
+{-|
+Module      : Data.Array.Accelerate.TensorFlow.Lite
+Copyright   : [2021..2022] The Accelerate Team
+License     : BSD3
+
+Maintainer  : Trevor L. McDonell <trevor.mcdonell@gmail.com>
+Stability   : experimental
+Portability : non-portable (GHC extensions)
+
+This is a backend for Accelerate that allows running programs on a Coral
+(<https://coral.ai>) Edge TPU. Unlike the Accelerate interpreter and the LLVM
+backends, there is no single @run@/@runN@ function, since compilation and
+execution have significantly different requirements in this context. However,
+running a model is not very difficult either.
+
+The simplest way to compile a model is to use 'compile', which takes an
+'Data.Array.Accelerate.Acc' function just like "runN" from the standard
+backends. It furthermore takes a list of examples of input data; for more
+details, see the documentation below in the [Representative sample
+data](#g:sampledata) section. The resulting 'Model' can then be executed on the
+device using 'execute'.
+
+Note that for e.g. the default Accelerate interpreter we have:
+
+@
+'Data.Array.Accelerate.Interpreter.runN' :: 'Afunction' f => f -> 'AfunctionR' f
+@
+
+Here, we have:
+
+@
+'compile' :: 'Afunction' f => f -> 'RepresentativeData' ('AfunctionR' f) -> 'Model' ('AfunctionR' f)
+'execute' :: 'Model' f -> f
+@
+
+so the composition of 'execute' and 'compile' (including some sample data for
+calibration) indeed results in the same signature as the more familiar
+@runN@-style functions.
+
+However, simply using 'compile' and 'execute' will yield very unsatisfactory performance:
+
+* Compilation involves calling out to the TensorFlow Lite API in Python, which
+    entails starting a Python interpreter, loading TensorFlow in that, and then
+    performing the actual operation (conversion of a TensorFlow model to a
+    TFLite model). Most of the time that this takes is spent in starting the
+    Python interprreter and loading TensorFlow, hence if you are compiling a
+    model more than once, it can save a lot of execution time to keep a Python
+    process running with TensorFlow imported, ready to convert multiple models.
+    The disadvantage of doing so is that such a Python process consumes around
+    300MB of RAM when idle.
+
+    If you want to share a Python process over multiple compilations, use
+    'withConverterPy' to start a Python process (or 'withConverterPy'' for more
+    configuration options), and then use 'compileWith' instead of 'compile' to
+    use the running service for the TFLite conversion.
+
+* Execution of a compiled model on a TPU involves requesting a "device context"
+    using @libedgetpu@. Doing so takes about 2.6 seconds (!) on our machine, and
+    is thus /very/ costly. If you want to execute multiple models (or the same
+    model multiple times), you should request such a device context once only,
+    and perform all model executions using the existing context.
+
+    You can do this by using 'withDeviceContext'. This will request a new TPU
+    device context and retain it as long as the passed 'IO' operation runs;
+    after the argument returns, the device context is released. You do not need
+    to do anything else; 'execute' will automatically pick up the existing held
+    device context if there is one.
+
+-}
 
 module Data.Array.Accelerate.TensorFlow.Lite (
 
-  -- * Representative sample data
+  -- * Representative sample data #sampledata#
   --
   -- | A TPU model is quantised, meaning that floating-point numbers in the
   -- source model are actually lowered to 8-bit integer arithmetic, under some
