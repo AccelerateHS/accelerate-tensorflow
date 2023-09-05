@@ -13,11 +13,18 @@
 
 </div>
 
-This package compiles Accelerate code to a [TensorFlow](https://www.tensorflow.org) graph. For details on
-Accelerate, refer to the [main repository](https://github.com/AccelerateHS/accelerate).
+This repository contains two packages:
+- `accelerate-tensorflow` compiles
+  [Accelerate](https://github.com/AccelerateHS/accelerate) code to a
+  [TensorFlow](https://www.tensorflow.org) graph. It allows running that graph
+  on the default TensorFlow backend (CPU).
+- `accelerate-tensorflow-lite` extends `accelerate-tensorflow` and allows
+  running the graph on a TPU using [Coral (from Google)](https://coral.ai/)'s
+  `libedgetpu` and the accompanying `edgetpu_compiler`. This works by
+  converting the graph to a TensorFlow Lite (TFLite) model, hence the name of
+  the package.
 
-Contributions and bug reports are welcome!<br>
-Please feel free to contact me through [GitHub](https://github.com/AccelerateHS/accelerate) or [gitter.im](https://gitter.im/AccelerateHS/Lobby).
+Contributions and bug reports are welcome.
 
 ## Dependencies
 
@@ -27,10 +34,14 @@ Still, a few things need to be installed on the system.
 1. From the [Coral apt repository](https://coral.ai/software/#debian-packages), get the `edgetpu_compiler` package.
    (The other edgetpu libraries are either not needed or compiled from source here.)
 
-2. **TODO: is protoc required?**
-   To build the required TensorFlow and TensorFlow-haskell packages, you need to have protoc installed.
-   If you do not have it installed, follow the directions on [this webpage](https://google.github.io/proto-lens/installing-protoc.html).
-   (The Ubuntu package name is `protobuf-compiler`.)
+2. Furthermore, install the following packages:
+   - GHC 8.10.7 and its dependencies (see the ghcup instructions)
+   - All dependencies needed by GHC
+   - The protobuf compiler `protoc` (`protobuf-compiler` on Ubuntu, or see [here](https://google.github.io/proto-lens/installing-protoc.html)).
+   - `curl`, `gawk`, `libusb-1.0-0-dev` (on Ubuntu)
+   - Python 3.10 (not 3.11!), including `pip`. Furthermore ensure that `python3` is available in PATH under the name `python`, to satisfy TensorFlow's build process.
+
+Apart from the Coral `edgetpu_compiler`, a sequence of commands starting from a (virtual) machine running fresh, "minimal" Ubuntu Server 22.04.3 and ending up with running the test suite is listed in [ubuntu-build-instructions.txt](ubuntu-build-instructions.txt).
 
 
 ## Compiling using Cabal
@@ -48,5 +59,8 @@ env LD_LIBRARY_PATH="$ENV" cabal run nofib-tensorflow-lite
 env LD_LIBRARY_PATH="$ENV" accelerate_tensorflow_lite_datadir="$PWD/accelerate-tensorflow-lite" "$(cabal list-bin nofib-tensorflow-lite)"
 ```
 
-This uses the Tensorflow submodule already contained within the tensorflow-haskell submodule.
-Currently, this is Tensorflow 2.10.1.
+A shorthand for the `env LD_LIBRARY_PATH="..."` prefix is [`./in-env.sh`](in-env.sh).
+
+The version of TensorFlow being used is that in the submodule contained within the `tensorflow-haskell` submodule.
+This is TensorFlow version 2.10.1.
+Both repositories have some patches applied at the time of writing, and are hence forks of upstream.
