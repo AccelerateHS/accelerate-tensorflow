@@ -18,10 +18,24 @@
 
 module Data.Array.Accelerate.TensorFlow.Lite (
 
-  Smart.Acc, Sugar.Arrays, Afunction, AfunctionR,
-  Model, RepresentativeData, Shapes, Args(..),
-  encodeModel, decodeModel,
+  -- * Representative sample data
+  --
+  -- | A TPU model is quantised, meaning that floating-point numbers in the
+  -- source model are actually lowered to 8-bit integer arithmetic, under some
+  -- affine transformation (i.e. the int8 ranges between a minimum and a maximum
+  -- float value, with equal spacing in between).
+  --
+  -- To calibrate this quantisation, the compilation process needs representative
+  -- sample input data, together with the shape of the output of the model.
 
+  RepresentativeData, Args(..), Shapes,
+
+  -- * Compiling a model
+  --
+  -- | The first step of running a TPU program is compiling the model to a
+  -- 'Model'. This can be done using 'compile' or 'compileWith'.
+
+  Model,
   compile,
   compileWith,
   ConverterPy,
@@ -30,10 +44,34 @@ module Data.Array.Accelerate.TensorFlow.Lite (
   ConverterSettings(..),
   defaultConverterSettings,
 
+  -- * Executing a compiled model
+  --
+  -- | After a model has been compiled, it can be executed on the TPU hardware.
+
   execute,
   withDeviceContext,
 
-  argMin, argMax
+  -- * Special cases
+  --
+  -- | These functions are additional Accelerate primitives with a special
+  -- implementation in TensorFlow. They have a fallback implementation (using
+  -- 'Data.Array.Accelerate.foreignAcc') that is implemented in standard
+  -- Accelerate, and hence work also on other backends (via the fallback
+  -- implementation).
+
+  argMin, argMax,
+
+  -- * Model serialisation
+  --
+  -- | These functions implement a bespoke model serialisation format (i.e. not
+  -- a TensorFlow-specific format). They can be used if you want to create a
+  -- model once, then re-calibrate and re-run it multiple times in various
+  -- invocations of your program.
+  --
+  encodeModel, decodeModel,
+
+  -- * Re-exports from Accelerate
+  Smart.Acc, Sugar.Arrays, Afunction, AfunctionR,
 
 ) where
 
@@ -83,6 +121,10 @@ import Prelude                                                                as
 -- | A representative data set for a given tensor computation. This
 -- typically consists of a subset of the data that was used for training.
 --
+-- The type @f@ is the type of the function as usually passed to @runN@, and
+-- as passed to 'Data.Array.Accelerate.TensorFlow.Lite.compile' with the TPU
+-- backend.
+--
 type RepresentativeData f = [Args f]
 
 
@@ -100,6 +142,8 @@ type RepresentativeData f = [Args f]
 --
 -- > m :: Model (a -> b -> c)
 -- > m = compile f args
+--
+-- Note that e.g. @'AfunctionR' ('Data.Array.Accelerate.Acc' a -> 'Data.Array.Accelerate.Acc' b -> 'Data.Array.Accelerate.Acc' c) = a -> b -> c@.
 --
 -- The compiled model can then be evaluated using 'execute' or serialised
 -- using 'encodeModel'.
@@ -148,7 +192,7 @@ compileWith' converter acc args = do
 -- > result :: Vector Word8
 -- > result = execute m xs ys
 --
--- **Note about contexts**:
+-- __Note about contexts__:
 -- If a TPU device context has not yet been acquired using 'withDeviceContext',
 -- 'execute' will open a new device context just for this evaluation and close
 -- it when the computation is finished. Opening a new device context is very

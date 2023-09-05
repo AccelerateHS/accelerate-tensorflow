@@ -26,6 +26,13 @@ import qualified Data.Array.Accelerate.TensorFlow.Lite.Representation.Shapes  as
 
 
 class Arrays a => HasShapes a where
+  -- | The shapes of the arrays in this type. The definition is as follows:
+  --
+  -- > Shapes (Array sh e) = sh
+  -- > Shapes () = ()
+  -- > Shapes (a, b) = (Shapes a, Shapes b)
+  -- > Shapes (a, b, c) = (Shapes a, Shapes b, Shapes c)
+  -- > -- etc.
   type Shapes a :: Type
   shapesR :: R.ShapesR (ArraysR a)
   fromShapes :: Shapes a -> R.Shapes (ArraysR a)

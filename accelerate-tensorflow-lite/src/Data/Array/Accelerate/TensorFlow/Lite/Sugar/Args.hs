@@ -47,8 +47,10 @@ infixr 0 :->
 -- ('Data.Array.Accelerate.Acc') arrays. For the output type @c@ we only
 -- need the extents ('Shapes') of each of the output arrays. For example:
 --
--- > Shapes (Array DIM1 Float) = DIM1
--- > Shapes (Array DIM1 Int8, Array DIM2 Float) = (DIM1, DIM2)
+-- @
+-- 'Shapes' ('Array' 'Data.Array.Accelerate.DIM1' Float) = 'Data.Array.Accelerate.DIM1'
+-- 'Shapes' ('Array' 'Data.Array.Accelerate.DIM1' Int8, 'Array' 'Data.Array.Accelerate.DIM2' Float) = ('Data.Array.Accelerate.DIM1', 'Data.Array.Accelerate.DIM2')
+-- @
 --
 data Args f where
   (:->)  :: Arrays a => a -> Args b -> Args (a -> b)

@@ -25,7 +25,7 @@ import GHC.IO.Exception                                             ( IOErrorTyp
 -- Handle lock, because when we clean up the process we try to close that
 -- handle, which could otherwise deadlock.
 --
--- Stolen from the 'process' package.
+-- Stolen from the @process@ package.
 --
 withForkWait :: IO () -> (IO () -> IO a) -> IO a
 withForkWait async body = do

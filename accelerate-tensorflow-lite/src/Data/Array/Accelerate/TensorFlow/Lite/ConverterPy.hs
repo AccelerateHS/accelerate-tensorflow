@@ -50,9 +50,11 @@ import Paths_accelerate_tensorflow_lite
 -- | The representation of a running converter.py process.
 --
 -- Every distinct 'ConverterPy' represents a distinct process. Access to these
--- processes is NOT thread-safe! See 'runConverterJob' for details.
+-- processes is NOT thread-safe! You can use separate 'ConverterPy' objects
+-- simultaneously just fine, but do run multiple jobs concurrently on a single
+-- 'ConverterPy'.
 data ConverterPy = ConverterPy ConverterSettings (IORef (Maybe CPImpl))
--- This is an IORef so that we can mutate the contents in-place. Nothing
+-- This is an IORef so that we can mutate the contents in-place. 'Nothing'
 -- indicates that no process has been started yet; presumably the last job
 -- failed, and we want to wait until a new job happens to start a new
 -- converter. Just indiates a running process.
@@ -63,10 +65,20 @@ data CPImpl = CPImpl
     Handle  -- ^ tflite output stream
     (IORef LB.ByteString)  -- ^ stderr
 
+-- | Some settings for the converter process.
 data ConverterSettings = ConverterSettings
-    { csVerbose :: Bool }
+    { csVerbose :: Bool
+      -- ^ Indicates whether to always show stdout/stderr output from the
+      -- conversion process (TensorFlow Lite). If @True@, stdout and stderr are
+      -- inherited from the Haskell process, meaning that informational as well
+      -- as error output (typically) end up in the terminal. If @False@, output
+      -- is captured and only printed if an error occurred. Note that the
+      -- @False@ option is sometimes unreliable: sometimes there is more output
+      -- than we can reliably print if an error occurs.
+    }
   deriving (Show)
 
+-- | Default settings for the converter. This sets verbose = false.
 defaultConverterSettings :: ConverterSettings
 defaultConverterSettings = ConverterSettings False
 
