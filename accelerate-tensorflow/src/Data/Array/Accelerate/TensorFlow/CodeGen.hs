@@ -273,7 +273,7 @@ buildOpenAcc aenv (OpenAcc pacc) =
             sh'                         = extend slice slix' sl'
 
             sh_                         = shapeToTensor shR sh'
-            sl_                         = shapeToTensor shR (pad slice sl')
+            slPadded_                   = shapeToTensor shR (pad slice sl')
 
             extend :: SliceIndex slix sl co sh -> TensorShape slix -> TensorShape sl -> TensorShape sh
             extend SliceNil              ()        ()       = ()
@@ -288,7 +288,8 @@ buildOpenAcc aenv (OpenAcc pacc) =
             array :: TypeR s -> TensorArrayData s -> TensorArrayData s
             array TupRunit         ()     = ()
             array (TupRpair aR bR) (a, b) = (array aR a, array bR b)
-            array (TupRsingle aR)  a      = buildTypeDictsScalar aR $ Sh.wrap "tile" TF.tile (Sh.wrap "reshape" TF.reshape a sl_) sh_
+            array (TupRsingle aR)  a      = buildTypeDictsScalar aR $
+              Sh.wrap "broadcastTo" TF.broadcastTo (Sh.wrap "reshape" TF.reshape a slPadded_) sh_
         in
         Tensor (ArrayR shR eR) sh' (array eR e')
 
