@@ -13,6 +13,7 @@ module Data.Array.Accelerate.Test.NoFib.Prelude
 
 import Data.Array.Accelerate.Test.NoFib.Base
 import Data.Array.Accelerate.Test.NoFib.Prelude.Backpermute
+import Data.Array.Accelerate.Test.NoFib.Prelude.Replicate
 import Data.Array.Accelerate.Test.NoFib.Prelude.Fold
 import Data.Array.Accelerate.Test.NoFib.Prelude.Generate
 import Data.Array.Accelerate.Test.NoFib.Prelude.Map
@@ -29,6 +30,7 @@ test_prelude tc =
     , test_zipWith tc
     , test_fold tc
     , test_backpermute tc
+    , test_replicate tc
     , test_generate tc
     , test_foreign tc
     ]

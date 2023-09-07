@@ -91,6 +91,7 @@ test-suite nofib-tensorflow-lite
       Data.Array.Accelerate.Test.NoFib.Imaginary.SAXPY
       Data.Array.Accelerate.Test.NoFib.Prelude
       Data.Array.Accelerate.Test.NoFib.Prelude.Backpermute
+      Data.Array.Accelerate.Test.NoFib.Prelude.Replicate
       Data.Array.Accelerate.Test.NoFib.Prelude.Fold
       Data.Array.Accelerate.Test.NoFib.Prelude.Generate
       Data.Array.Accelerate.Test.NoFib.Prelude.Map
