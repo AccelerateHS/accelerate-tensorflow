@@ -51,7 +51,7 @@ However, simply using 'compile' and 'execute' will yield very unsatisfactory per
     entails starting a Python interpreter, loading TensorFlow in that, and then
     performing the actual operation (conversion of a TensorFlow model to a
     TFLite model). Most of the time that this takes is spent in starting the
-    Python interprreter and loading TensorFlow, hence if you are compiling a
+    Python interpreter and loading TensorFlow, hence if you are compiling a
     model more than once, it can save a lot of execution time to keep a Python
     process running with TensorFlow imported, ready to convert multiple models.
     The disadvantage of doing so is that such a Python process consumes around
@@ -264,7 +264,9 @@ compileWith' converter acc args = do
 -- slow (about 2.6 seconds on our system), so if you care about performance, it
 -- is probably worth doing it once only.
 --
--- TODO: Is the TPU usable by other processes while we have a context open?
+-- Furthermore, be aware that /acquiring/ a context steals the context from any
+-- other process that has it open! It seems that only one context can be open
+-- on a TPU device at one time, and the /last/ requester wins.
 --
 execute :: Model f -> f
 execute (Model afunR fun buffer) = eval afunR fun 0 []
@@ -357,7 +359,9 @@ execute (Model afunR fun buffer) = eval afunR fun 0 []
 -- open yet. However, opening a context is very slow, so using
 -- 'withDeviceContext' is worth it for performance.
 --
--- TODO: Is the TPU usable by other processes while we have a context open?
+-- Furthermore, be aware that /acquiring/ a context steals the context from any
+-- other process that has it open! It seems that only one context can be open
+-- on a TPU device at one time, and the /last/ requester wins.
 --
 withDeviceContext :: IO a -> IO a
 withDeviceContext action =
