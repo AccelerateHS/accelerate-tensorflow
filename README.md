@@ -13,6 +13,15 @@
 
 </div>
 
+# EXPERIMENTAL: BE AWARE
+
+This repository contains experimental code.
+Neither the plain TensorFlow CPU backend nor the TFLite backend support all Accelerate primitives, and there are multiple compatibility as well as correctness issues with Coral's TPU SDK and (probably) our usage of it.
+
+The packages here are **NOT** yet suitable for actual use.
+
+## Packages
+
 This repository contains two packages:
 - `accelerate-tensorflow` compiles
   [Accelerate](https://github.com/AccelerateHS/accelerate) code to a
