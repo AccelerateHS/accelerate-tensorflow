@@ -9,7 +9,8 @@ import qualified Data.Array.Accelerate.TensorFlow as TFCPU
 import qualified Data.Array.Accelerate.TensorFlow.Lite as TPU
 
 
--- matrix is a vector of rows
+-- This is matrix-matrix multiplication. We represent a matrix as a vector of
+-- rows, i.e. the inner dimension of a Matrix is a row.
 matmat :: A.Acc (A.Matrix Float) -> A.Acc (A.Matrix Float) -> A.Acc (A.Matrix Float)
 matmat a b =
   let A.I2 k m = A.shape a
@@ -45,7 +46,7 @@ main = do
   putStrLn "## Running in the interpreter"
   print $ I.runN matmat a1 b1
 
-  -- First let's run it on the CPU using TensorFlow
+  -- Then run it on the CPU using TensorFlow
   putStrLn "## Running on TensorFlow native CPU"
   print $ TFCPU.runN matmat a1 b1
 
