@@ -79,6 +79,10 @@ However, simply using 'compile' and 'execute' will yield very unsatisfactory per
 For a "Hello World"-style example of how to use this backend, see
 <https://github.com/AccelerateHS/accelerate-tensorflow/blob/master/accelerate-tensorflow-lite/test/examples/Main.hs>.
 
+=== Implementation documentation
+
+Some documentation on the internals of the backend can be found in the repository at <https://github.com/AccelerateHS/accelerate-tensorflow/blob/master/doc>.
+
 -}
 
 module Data.Array.Accelerate.TensorFlow.Lite (

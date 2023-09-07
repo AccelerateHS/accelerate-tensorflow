@@ -78,3 +78,8 @@ Both repositories have some patches applied at the time of writing, and are henc
 ## Usage example
 
 For an example of how to use both backends defined in this repository, see [accelerate-tensorflow-lite/test/examples/Main.hs](accelerate-tensorflow-lite/test/examples/Main.hs).
+
+
+## Further documentation
+
+Some further documentation on the implementation of the backends can be found in the [doc](doc) directory.
