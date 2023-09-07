@@ -64,3 +64,8 @@ A shorthand for the `env LD_LIBRARY_PATH="..."` prefix is [`./in-env.sh`](in-env
 The version of TensorFlow being used is that in the submodule contained within the `tensorflow-haskell` submodule.
 This is TensorFlow version 2.10.1.
 Both repositories have some patches applied at the time of writing, and are hence forks of upstream.
+
+
+## Usage example
+
+For an example of how to use both backends defined in this repository, see [accelerate-tensorflow-lite/test/examples/Main.hs](accelerate-tensorflow-lite/test/examples/Main.hs).

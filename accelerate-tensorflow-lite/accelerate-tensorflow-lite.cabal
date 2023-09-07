@@ -112,3 +112,18 @@ test-suite nofib-tensorflow-lite
     , tasty-hedgehog
     , tasty-hunit
   default-language: Haskell2010
+
+test-suite acctflite-examples
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+  hs-source-dirs:
+      test/examples
+  ghc-options: -Wall -O2 -Werror=tabs
+  build-depends:
+      accelerate ==1.3.*
+    , accelerate-tensorflow
+    , accelerate-tensorflow-lite
+    , base >=4.7 && <5
+    , random
+  default-language: Haskell2010

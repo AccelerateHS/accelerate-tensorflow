@@ -8,6 +8,8 @@ cradle:
       component: "accelerate-tensorflow-lite:lib:accelerate-tensorflow-lite"
     - path: "./accelerate-tensorflow-lite/test/nofib"
       component: "accelerate-tensorflow-lite:test:nofib-tensorflow-lite"
+    - path: "./accelerate-tensorflow-lite/test/examples"
+      component: "accelerate-tensorflow-lite:test:acctflite-examples"
     - path: "./extra-deps/accelerate/src"
       component: "accelerate:lib:accelerate"
     - path: "./extra-deps/accelerate/test/doctest"

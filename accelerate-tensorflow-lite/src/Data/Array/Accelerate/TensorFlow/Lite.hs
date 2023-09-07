@@ -74,6 +74,11 @@ However, simply using 'compile' and 'execute' will yield very unsatisfactory per
     to do anything else; 'execute' will automatically pick up the existing held
     device context if there is one.
 
+=== Usage example
+
+For a "Hello World"-style example of how to use this backend, see
+<https://github.com/AccelerateHS/accelerate-tensorflow/blob/master/accelerate-tensorflow-lite/test/examples/Main.hs>.
+
 -}
 
 module Data.Array.Accelerate.TensorFlow.Lite (
