@@ -72,9 +72,6 @@ prop_app tc dim e =
     ndat <- forAll (Gen.int (Range.linear 10 16))
     dat1 <- forAll (Gen.list (Range.singleton ndat) (array ForSample sh1 e))
     dat2 <- forAll (Gen.list (Range.singleton ndat) (array ForSample sh2 e))
-    liftIO $ putStrLn $ show sh1 P.++ " | " P.++ show sh2
-    liftIO $ print dat1
-    liftIO $ print dat2
     xs <- forAll (array ForInput sh1 e)
     ys <- forAll (array ForInput sh2 e)
     let sh = appendresultshape sh1 sh2
