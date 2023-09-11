@@ -44,6 +44,7 @@ test_backpermute tc =
       testDIM2 =
         testGroup "DIM2"
           [ testProperty "transpose" $ prop_transpose tc f32
+          , testProperty "reverse"   $ prop_reverse   tc f32
           ]
 
 prop_transpose
@@ -58,6 +59,18 @@ prop_transpose tc e =
     xs  <- forAll (array ForInput sh e)
     tpuTestCase tc A.transpose dat xs
 
+prop_reverse
+    :: (Elt e, Show e, Similar e)
+    => TestContext
+    -> (WhichData -> Gen e)
+    -> Property
+prop_reverse tc e =
+  property $ do
+    sh  <- forAll dim1
+    dat <- forAllWith (const "sample-data") (generate_sample_data_reverse sh e)
+    xs  <- forAll (array ForInput sh e)
+    tpuTestCase tc A.reverse dat xs
+
 generate_sample_data_transpose
   :: Elt e
   => DIM2
@@ -68,3 +81,13 @@ generate_sample_data_transpose sh@(Z :. h :. w) e = do
   xs <- Gen.list (Range.singleton i) (array ForSample sh e)
   return [ x :-> Result (Z :. w :. h) | x <- xs ]
 
+
+generate_sample_data_reverse
+  :: Elt e
+  => DIM1
+  -> (WhichData -> Gen e)
+  -> Gen (RepresentativeData (Array DIM1 e -> Array DIM1 e))
+generate_sample_data_reverse sh@(Z :. sz) e = do
+  i  <- Gen.int (Range.linear 10 16)
+  xs <- Gen.list (Range.singleton i) (array ForSample sh e)
+  return [ x :-> Result (Z :. sz) | x <- xs ]

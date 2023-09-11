@@ -35,6 +35,7 @@ import qualified Hedgehog.Range                                     as Range
 import Test.Tasty
 import Test.Tasty.Hedgehog
 
+import Control.Monad.IO.Class
 import Prelude                                                      as P
 
 
@@ -53,7 +54,33 @@ test_foreign tc =
         testGroup ("DIM" P.++ show (rank @sh))
           [ testProperty "argmin" $ prop_min tc dim f32
           , testProperty "argmax" $ prop_max tc dim i16
+          , testProperty "append_i32" $ prop_app tc dim i32
+          , testProperty "append_f32" $ prop_app tc dim f32
           ]
+
+
+prop_app
+    :: (P.Eq sh, Show sh, Shape sh, Elt e, Show e, Similar e)
+    => TestContext
+    -> Gen (sh:.Int)
+    -> (WhichData -> Gen e)
+    -> Property
+prop_app tc dim e =
+  property $ do
+    sh1 <- forAll (Gen.filter (\(_ :. n) -> n P.> 0) dim)
+    sh2 <- forAll (Gen.filter (\(_ :. n) -> n P.> 0) dim)
+    ndat <- forAll (Gen.int (Range.linear 10 16))
+    dat1 <- forAll (Gen.list (Range.singleton ndat) (array ForSample sh1 e))
+    dat2 <- forAll (Gen.list (Range.singleton ndat) (array ForSample sh2 e))
+    liftIO $ putStrLn $ show sh1 P.++ " | " P.++ show sh2
+    liftIO $ print dat1
+    liftIO $ print dat2
+    xs <- forAll (array ForInput sh1 e)
+    ys <- forAll (array ForInput sh2 e)
+    let sh = appendresultshape sh1 sh2
+    tpuTestCase tc append (P.zipWith (\a b -> a :-> b :-> Result sh) dat1 dat2) xs ys
+  where
+    appendresultshape (sh1:.sz1) (sh2:.sz2) = Data.Array.Accelerate.Sugar.Shape.intersect sh1 sh2 :. sz1+sz2
 
 prop_min
     :: (P.Eq sh, Show sh, Shape2 sh, Elt e, Show e, Similar e, A.Ord e, P.Ord e, P.Num e)

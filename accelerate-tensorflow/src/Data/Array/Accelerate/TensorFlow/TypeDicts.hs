@@ -39,7 +39,7 @@ type TypeDictsFor t s =
   (Storable t
   ,Typeable s
   ,Show s
-  ,IsScalar t
+  ,IsSingle t
   ,s ~ ScalarTensorDataR t
   ,TF.TensorType s
   ,TArrayDataR Sh.Tensor t ~ Sh.Tensor s

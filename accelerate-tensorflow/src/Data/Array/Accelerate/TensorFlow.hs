@@ -26,7 +26,7 @@ module Data.Array.Accelerate.TensorFlow (
   run,
   runN,
 
-  argMin, argMax
+  argMin, argMax, append
 
 ) where
 
@@ -57,6 +57,7 @@ import Data.Array.Accelerate.TensorFlow.CodeGen.Foreign
 import qualified Proto.Tensorflow.Core.Framework.NodeDef_Fields     as TF
 import qualified TensorFlow.Build                                   as TF
 import qualified TensorFlow.Core                                    as TF
+import qualified TensorFlow.Ops                                     as TF
 import qualified TensorFlow.Tensor                                  as TF
 import qualified TensorFlow.Types                                   as TF
 import qualified TensorFlow.Internal.FFI                            as Internal
@@ -73,6 +74,7 @@ import Text.Printf
 import qualified Data.Text                                          as T
 import qualified Data.Vector.Storable                               as V
 
+import qualified Data.Array.Accelerate.TensorFlow.CodeGen.Arithmetic as Ar
 
 -- | Run a complete embedded program using the default TensorFlow backend
 --
@@ -248,3 +250,32 @@ argMin, argMax :: (A.Ord a, Shape sh) => Acc (Array (sh :. Int) a) -> Acc (Array
 argMin = argMinMax Min
 argMax = argMinMax Max
 
+-- Specialised instance, because naive translation through `generate` results in a 'select' over two generates that both include out-of-bounds indexing.
+append :: (Shape sh, A.Elt e) => Acc (Array (sh :. Int) e) -> Acc (Array (sh :. Int) e) -> Acc (Array (sh :. Int) e)
+append xs ys = A.foreignAcc
+  (ForeignAcc "append" tensorflowappend)
+  (\(T2 xs' ys') -> xs' A.++ ys')
+  (backpermuteToSameSize $ T2 xs ys)
+  where
+    tensorflowappend :: (((), Tensor (sh,Int) e), Tensor (sh,Int) e) -> Tensor (sh,Int) e
+    tensorflowappend (((), Tensor (R.ArrayR (ShapeRsnoc shR) eR) (sh,szl) l)
+                         , Tensor (R.ArrayR _                _ ) (_ ,szr) r) = 
+                           Tensor (R.ArrayR (ShapeRsnoc shR) eR) (sh, szl+szr) (go eR l r)
+      where
+        go :: TypeR e -> TensorArrayData e -> TensorArrayData e -> TensorArrayData e
+        go TupRunit () () = ()
+        go (TupRpair l r) (l1,r1) (l2,r2) = (go l l1 l2, go r r1 r2)
+        go (TupRsingle t) x y = buildTypeDictsScalar t $ Sh.wrapConcat (fromIntegral $ rank shR) [x, y]
+        -- zipmin :: forall e. TypeR e -> TensorArrayData e -> TensorArrayData e -> TensorArrayData e
+        -- zipmin TupRunit () () = ()
+        -- zipmin (TupRpair l r) (l1,r1) (l2,r2) = (zipmin l l1 l2, zipmin r r1 r2)
+        -- zipmin (TupRsingle t) x y = buildTypeDictsScalar t $ Ar.min (singleType @e) (x, y)
+
+    backpermuteToSameSize :: (Shape sh, A.Elt e) => Acc (Array (sh:.Int) e, Array (sh:.Int) e) -> Acc (Array (sh:.Int) e, Array (sh:.Int) e)
+    backpermuteToSameSize (T2 xs ys) = T2 xs' ys'
+      where
+        xs' = A.backpermute (sh::.szx) id xs
+        ys' = A.backpermute (sh::.szy) id ys
+        shx ::. szx = A.shape xs
+        shy ::. szy = A.shape ys
+        sh = A.intersect shx shy

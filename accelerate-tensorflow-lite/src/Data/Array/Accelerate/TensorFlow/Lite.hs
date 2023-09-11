@@ -124,7 +124,7 @@ module Data.Array.Accelerate.TensorFlow.Lite (
   -- Accelerate, and hence work also on other backends (via the fallback
   -- implementation).
 
-  argMin, argMax,
+  argMin, argMax, append,
 
   -- * Model serialisation
   --
