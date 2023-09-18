@@ -50,7 +50,27 @@ Still, a few things need to be installed on the system.
    - `curl`, `gawk`, `libusb-1.0-0-dev` (on Ubuntu)
    - Python 3.10 (not 3.11!), including `pip`. Furthermore ensure that `python3` is available in PATH under the name `python`, to satisfy TensorFlow's build process.
 
-Apart from the Coral `edgetpu_compiler`, a sequence of commands starting from a (virtual) machine running fresh, "minimal" Ubuntu Server 22.04.3 and ending up with running the test suite is listed in [ubuntu-build-instructions.txt](ubuntu-build-instructions.txt).
+A sequence of commands starting from a (virtual) machine running fresh, "minimal" Ubuntu Server 22.04.3 and ending up with running the test suite is listed in [ubuntu-build-instructions.txt](ubuntu-build-instructions.txt), but note that this excludes two things:
+1. The installation of the Coral `edgetpu_compiler`;
+2. The setup of the udev rules: see the next section.
+
+
+## Udev rules
+
+In order to be able to access the TPU hardware using a non-root user, you will need to set up udev rules.
+For the Coral USB Accelerator, the following rules work: (note that both rules are necessary)
+```
+$ cat /etc/udev/rules.d/99-edgetpu-accelerator.rules
+SUBSYSTEM=="usb",ATTRS{idVendor}=="1a6e",GROUP="edgetpu"
+SUBSYSTEM=="usb",ATTRS{idVendor}=="18d1",GROUP="edgetpu"
+```
+To get access to the hardware, one then needs to add your Linux user to the `edgetpu` group.
+(This is the `GROUP=` field in the udev rules; you can name this group differently if you want.)
+Do not forget to re-login after updating your Linux user.
+
+Note that while this may also work for other Coral EdgeTPU hardware, you may need to consult the vendor of your specific hardware for details on the device IDs.
+
+A symptom that these udev rules are not set up correctly is getting `ERROR: Failed to retrieve TPU context.`; when `strace`ing the executable, one then sees that you're getting "Permission denied" errors when accessing the USB device.
 
 
 ## Compiling using Cabal
